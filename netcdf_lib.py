@@ -34,6 +34,7 @@ import os.path # basename and folder name of a path
 import glob # # Import all the file of a folder
 import functools
 import pandas as pd
+import scipy
 
 class SpecVar():
     Cst={"P0":100000,
@@ -100,7 +101,7 @@ class SpecVar():
         QS = arps.get('QS')
 
         data=QI.data + QH.data + QR.data + QC.data + QS.data
-        result = scipy.io.netcdf.netcdf_variable(data, QI.typecode(), QI.shape, QI.dimensions)
+        result = scipy.io.netcdf.netcdf_variable(data, QI.typecode(),QI._size, QI.shape, QI.dimensions)
         result.long_name=self.varname['QT']
 
         return result
@@ -112,7 +113,7 @@ class SpecVar():
 
         PT=arps.get('PT')
         data=PT.data-273.15
-        results=scipy.io.netcdf.netcdf_variable(data,PT.typecode(),PT.shape,PT.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,PT.typecode(),PT._size,PT.shape,PT.dimensions)
         results.long_name=self.varname['PTc']
         results.units='C'
         return results
@@ -123,7 +124,7 @@ class SpecVar():
         print('Calculate the Pressure in Hectopascale')
         P=arps.get('P')
         data=P.data*10**-2
-        results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P.shape,P.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P._size,P.shape,P.dimensions)
         results.long_name=self.varname['Phpa']
         results.units='hpa'
         return results 
@@ -134,7 +135,7 @@ class SpecVar():
         print('Calculate the pressure in hectopascale')
         PBAR=arps.get('PBAR')
         data=PBAR.data*10**-2
-        results=scipy.io.netcdf.netcdf_variable(data,PBAR.typecode(),PBAR.shape,PBAR.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,PBAR.typecode(),PBAR._size,PBAR.shape,PBAR.dimensions)
         results.long_name=self.varname['Pbarhpa']
         results.units='hpa'
 
@@ -147,7 +148,7 @@ class SpecVar():
         Phpa=arps.get('Phpa')
         Pbarhpa=arps.get('Pbarhpa')
         data=Phpa.data+Pbarhpa.data
-        results=scipy.io.netcdf.netcdf_variable(data,Phpa.typecode(),Phpa.shape,Phpa.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,Phpa.typecode(),Phpa._size,Phpa.shape,Phpa.dimensions)
         results.longname=self.varname['Ptot']
 
         return results
@@ -163,7 +164,7 @@ class SpecVar():
         QV=arps.get('QV')
         data=PT.data*((1+(QV.data/Eps))/(1+QT.data))
 
-        results=scipy.io.netcdf.netcdf_variable(data,QT.typecode(),QT.shape,QT.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,QT.typecode(),ThetaV._size,QT.shape,QT.dimensions)
         results.long_name=self.varname['ThetaV']
         results.units='C'
 
@@ -176,14 +177,14 @@ class SpecVar():
         P=arps.get('P')
         PT=arps.get('PT')
         data=PT.data*(P.data/self.Cst['P0'])**(self.Cst['Rd']/self.Cst['Cp'])
-        results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P.shape,P.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P._size,P.shape,P.dimensions)
         results.long_name=self.varname['Tk']
         results.units='k'
         return results
     def __Tc(self,arps):
         Tk=arps.get('Tk')
         data=Tk.data-273.15
-        results=scipy.io.netcdf.netcdf_variable(data,Tk.typecode(),Tk.shape,Tk.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,Tk.typecode(),Tk._size,Tk.shape,Tk.dimensions)
         results.long_name=self.varname['Tc']
         results.units='C'
         return results
@@ -195,7 +196,7 @@ class SpecVar():
         QV= arps.get('QV')
         P=arps.get('P')
         data=((QV.data*(P.data))/(0.622+QV.data))
-        results=scipy.io.netcdf.netcdf_variable(data,QV.typecode(),QV.shape,QV.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,QV.typecode(),QV._size,QV.shape,QV.dimensions)
         results.long_name=self.varname['Pv']
         results.units='Pa'
 
@@ -208,7 +209,7 @@ class SpecVar():
         Pv=arps.get('Pv')
         P=arps.get('P')
         data=P.data-Pv.data
-        results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P.shape,P.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P._size,P.shape,P.dimensions)
         results.long_name=self.varname['Pd']
         results.units='Pa'
 
@@ -221,7 +222,7 @@ class SpecVar():
         print('Calculate the vapor pressure at saturation')
         Tk=arps.get('Tk')
         data=6.112*np.exp(17.62*(Tk.data-273.15)/(243.12+(Tk.data-273.15)))*10**2
-        results=scipy.io.netcdf.netcdf_variable(data,Tk.typecode(),Tk.shape,Tk.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,Tk.typecode(),Tk._size,Tk.shape,Tk.dimensions)
         results .long_name=self.varname['Psat']
 
         return results
@@ -233,7 +234,7 @@ class SpecVar():
         Pv=arps.get('Pv')
         Psat=arps.get('Psat')
         data=(Pv.data/Psat.data)*100
-        results=scipy.io.netcdf.netcdf_variable(data,Pv.typecode(),Pv.shape,Pv.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,Pv.typecode(),Pv._size,Pv.shape,Pv.dimensions)
         results.long_name=self.varname['Rh']
         results.units='%'
 
@@ -253,7 +254,7 @@ class SpecVar():
         Second=Rh**((-QV.data*self.Cst['Rv'])/(self.Cst['Cpd']+rtc))
         Third=np.exp((self.Cst['Lv']*QV.data)/((self.Cst['Cpd']+rtc)*Tk.data))
         data=First*Second*Third
-        results=scipy.io.netcdf.netcdf_variable(data,QV.typecode(),QV.shape,QV.dimensions)
+        results=scipy.io.netcdf.netcdf_variable(data,QV.typecode(),QV._size,QV.shape,QV.dimensions)
         results.long_name=self.varname['ThetaE']
         results.units='k'
 
@@ -277,7 +278,8 @@ class SpecVar():
 
         pnyc = Proj(proj='lcc',datum='WGS84',lat_1=truelat1,lat_2=truelat2,lat_0=ctrlat,lon_0=ctrlon)
         Lon_arps,Lat_arps= pnyc(x_stag[1:]-(x_stag[:].max())/2,y_stag[1:]-(y_stag[:].max())/2, inverse=True)
-        Lat=scipy.io.netcdf.netcdf_variable(Lat_arps,x_stag.typecode(),x_stag.shape[0]-1,x_stag.dimensions)
+
+        Lat=scipy.io.netcdf.netcdf_variable(Lat_arps,x_stag.typecode(),x_stag._size,x_stag.shape[0]-1,x_stag.dimensions)
         Lat.long_name=self.varname['Lat']
 
         return Lat
@@ -301,7 +303,7 @@ class SpecVar():
         pnyc = Proj(proj='lcc',datum='WGS84',lat_1=truelat1,lat_2=truelat2,lat_0=ctrlat,lon_0=ctrlon)
         Lon_arps,Lat_arps= pnyc(x_stag[1:]-(x_stag[:].max())/2,y_stag[1:]-(y_stag[:].max())/2, inverse=True)
 
-        Lon=scipy.io.netcdf.netcdf_variable(Lon_arps,y_stag.typecode(),y_stag.shape[0]-1,y_stag.dimensions)
+        Lon=scipy.io.netcdf.netcdf_variable(Lon_arps,y_stag.typecode(),y_stag._size,y_stag.shape[0]-1,y_stag.dimensions)
         Lon.long_name=self.varname['Lon']
         
         return Lon
@@ -313,7 +315,8 @@ class SpecVar():
         resLat=transpose(resLat)
         Zarray=np.array([1]).repeat(Z.shape)
         resLat=Zarray[:,None,None]*resLat
-        Latgrid=scipy.io.netcdf.netcdf_variable(resLat,Lat.typecode(),(Z.shape,Lat.shape,Lon.shape),(Z.dimensions,Lat.dimensions,Lon.dimensions))
+        size=3
+        Latgrid=scipy.io.netcdf.netcdf_variable(resLat,Lat.typecode(),size,(Z.shape,Lat.shape,Lon.shape),(Z.dimensions,Lat.dimensions,Lon.dimensions))
         Latgrid.long_name=self.varname['Latgrid']
         return Latgrid
 
@@ -325,7 +328,8 @@ class SpecVar():
         resLon=transpose(resLon)
         Zarray=np.array([1]).repeat(Z.shape)
         resLon=Zarray[:,None,None]*resLon
-        Longrid=scipy.io.netcdf.netcdf_variable(resLon,Lon.typecode(),(Z.shape,Lat.shape,Lon.shape),(Z.dimensions,Lat.dimensions,Lon.dimensions))
+        size=3
+        Longrid=scipy.io.netcdf.netcdf_variable(resLon,Lon.typecode(),size,(Z.shape,Lat.shape,Lon.shape),(Z.dimensions,Lat.dimensions,Lon.dimensions))
         return Longrid
 
 class FileProperties():
@@ -343,7 +347,8 @@ class FileProperties():
             
             if model == "ARPS":
                 filetime=int(os.path.basename(InPath)[-6:])
-                initime=self.__dict__["INITIAL_TIME"]
+#                 initime=self.__dict__["INITIAL_TIME"] # need to be implemented
+                initime ='2015-01-01_21:00:00'
                 UTC=UTC*3600
                 Init = datetime.datetime.strptime(initime, "%Y-%m-%d_%H:%M:%S")
                 Fortime=datetime.timedelta(seconds=filetime)
@@ -750,8 +755,6 @@ class netcdf_serie():
 
 
 
-
-
 class ArpsFigures():
     def __init__(self,arps):
         self.arps=arps# Es ce que ca duplique les donnés de arps ?????????????  
@@ -860,7 +863,7 @@ class ArpsFigures():
             except:
                 selected='2d variable selected'
                 try:
-                    Ndata=data[ILatmin:ILatmax,ILonmin:ILonmax]
+                    Ndata=data[0,ILatmin:ILatmax,ILonmin:ILonmax]
                     Ndata=np.squeeze(Ndata)
                     self.__setparadef('varmax',Ndata.max())
                     self.__setparadef('varmin',Ndata.min())
@@ -1121,6 +1124,4 @@ class ArpsFigures2():
             print filename
 
         pass
-
-
 
