@@ -48,12 +48,15 @@ for j in range(0,ForJ):
 # NOMAD WEBSITE
 #===============================================================================
 
+
+
+
 import urllib
 
 OutPath="/dados2/gfs/"
 
-years=map(str,[2015])
-months=map(str,range(01,05))
+years=map(str,[2014])
+months=map(str,range(01,12))
 days=map(str,range(1,32))
 hours=map(str,range(0,27,3))
 
@@ -63,6 +66,7 @@ for year in years:
 		for day in days:
 			day=day.zfill(2)
 			for hour in hours:
+
 # 				for fhour in hours:
 				base="http://nomads.ncdc.noaa.gov/data/gfs4/"
 				dirfolder = year+month
@@ -78,9 +82,40 @@ for year in years:
 				except:
 					print('Not such file or directory')
 
-filename="gfs_4_20140901_0000_000.grb2"
-url="http://nomads.ncdc.noaa.gov/data/gfs4/201408/20140820/gfs_4_20140820_0000_000.grb2"
-urllib.urlretrieve(url,OutPath+filename)
+
+
+
+
+import urllib
+
+OutPath="/dados2/gfs/"
+
+years=map(str,[2015])
+months=map(str,range(06,12))
+days=map(str,range(1,32))
+hours=map(str,range(0,27,3))
+
+for year in years: 
+	for month in months:
+		month=month.zfill(2)
+		for day in days:
+			day=day.zfill(2)
+			for hour in hours:
+
+# 				for fhour in hours:
+				base="http://nomads.ncdc.noaa.gov/data/gfs4/"
+				dirfolder = year+month
+				subfolder = year+month+day
+				filename = "gfs_4_"+year+month+day+"_"+hour.rjust(2,'0').ljust(4,'0')+"_"+'12'.zfill(3)+".grb2"
+				url=base+dirfolder+"/"+subfolder+"/"+filename
+				print(url)
+				try:
+					print("======")
+					print("downloading"+" from:  " + url)
+					urllib.urlretrieve(url,OutPath+filename)
+					print("download successful !!!")
+				except:
+					print('Not such file or directory')
 
 
 				

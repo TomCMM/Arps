@@ -26,7 +26,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import scipy.ndimage
-from pylab import *
+# from pylab import *
 import matplotlib.gridspec as gridspec
 import csv
 import datetime
@@ -35,6 +35,7 @@ import glob # # Import all the file of a folder
 import functools
 import pandas as pd
 import scipy
+import sys
 
 class SpecVar():
     Cst={"P0":100000,
@@ -344,41 +345,54 @@ class FileProperties():
 
         def __time(self,InPath,model):
             UTC=3 #Hour
+            print "*"*100
+            print "*"*100
             
-            if model == "ARPS":
-                filetime=int(os.path.basename(InPath)[-6:])
-#                 initime=self.__dict__["INITIAL_TIME"] # need to be implemented
-                initime ='2015-01-01_21:00:00'
-                UTC=UTC*3600
-                Init = datetime.datetime.strptime(initime, "%Y-%m-%d_%H:%M:%S")
-                Fortime=datetime.timedelta(seconds=filetime)
-                UTCtime=datetime.timedelta(seconds=UTC)
-                Time=str(Init+Fortime-UTCtime)
-                self.attributes['time']=Time
+            try:
+                if model == "ARPS":
+                    filetime=int(os.path.basename(InPath)[-6:])
+    #                 initime=self.__dict__["INITIAL_TIME"] # need to be implemented
+                    initime ='2015-01-01_21:00:00'
+                    UTC=UTC*3600
+                    Init = datetime.datetime.strptime(initime, "%Y-%m-%d_%H:%M:%S")
+                    Fortime=datetime.timedelta(seconds=filetime)
+                    UTCtime=datetime.timedelta(seconds=UTC)
+                    Time=str(Init+Fortime-UTCtime)
+                    self.attributes['time']=Time
+        
+                if model == 'GFS':
+                    """
+                    ANALYSIS
+                    fnl_20150424_06_00.grib2.nc
+                    """
+                    filetime=os.path.basename(InPath)[4:18]
+                    Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H_%M")
+                    Time=Time-datetime.timedelta(hours=UTC)
+                    self.attributes['time']=Time
     
-            if model == 'GFS':
-                """
-                ANALYSIS
-                fnl_20150424_06_00.grib2.nc
-                """
-                filetime=os.path.basename(InPath)[4:18]
-                Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H_%M")
+                if model == 'GFS_for':
+                    """
+                    From Nomade
+                    Forecast
+                    gfs_4_20140815_0000_000.grb2.nc
+                    """
+                    filetime=os.path.basename(InPath)[6:19]
+                    Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H%M")
+                    Time=Time-datetime.timedelta(hours=UTC)
+                    fortime=datetime.datetime.strptime(os.path.basename(InPath)[21:23], "%H")
+    
+                    self.attributes['time']=Time
+                    self.attributes['forecast']=fortime
+            except ValueError:
+                time = input("Enter UTC time in format->  %Y%m%d_%H_%M: ")
+                print "your tiped:"+ time
+                Time = datetime.datetime.strptime(time, "%Y%m%d_%H_%M")
                 Time=Time-datetime.timedelta(hours=UTC)
                 self.attributes['time']=Time
-
-            if model == 'GFS_for':
-                """
-                From Nomade
-                Forecast
-                gfs_4_20140815_0000_000.grb2.nc
-                """
-                filetime=os.path.basename(InPath)[6:19]
-                Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H%M")
-                Time=Time-datetime.timedelta(hours=UTC)
-                fortime=datetime.datetime.strptime(os.path.basename(InPath)[21:23], "%H")
-
-                self.attributes['time']=Time
-                self.attributes['forecast']=fortime
+                    
+                    
+    
+                    
 #             if model == 'GFS2':
 #                 """
 #                 GFS_Global_0p5deg_20140101_0000_anl.grib2.nc
@@ -410,9 +424,12 @@ class BaseVars():
     model: Type of the model use: Arps or GFS
     """
     def __init__(self, InPath, model):
-        f = netcdf.netcdf_file(InPath, 'r')# works with mmap= False but very slow
+        
+
+        f = netcdf.netcdf_file(InPath, 'r',mmap=True)# works with mmap= False but very slow
         self.__dict__ = f.__dict__.copy() # copy the attributs of the object
-        self.__dict__['data'] = f.variables
+        self.__dict__['data'] = f.variables.copy()
+#         f.close() # MARCELO < - Should I close here ??
         del(self.variables)
         self.module = { }
         self.varname = { }
@@ -421,7 +438,7 @@ class BaseVars():
          
         self.__load(f)
         f.close() # MARCELO < - Should I close here ??
- 
+
         self.__applymap(model)
 
     def __properties(self,InPath,model):
@@ -621,8 +638,8 @@ class arps():
         Iselect = [ ]# Indice of the selection
         for d,s in zip(olddim,select):
             
-            if diff(s) != 0:
-                newdim.append(d)
+#             if diff(s) != 0: # Putain il sort d ou ce diff ?
+#                 newdim.append(d)
 
             print("dimensions %s",d)
             print("user input %s",s)
@@ -678,7 +695,7 @@ class arps():
 
         try:
             data = self.__cachedata[variable]
-            return data
+#             return data
         except KeyError, e:
             # try if the variable is in the BASEVAR
             try:
@@ -687,7 +704,8 @@ class arps():
                 self.__cachedata[variable] = data
             except KeyError,e:
                 print >>sys.stderr, "%s is not know,\n%s" % (variable, str(e))
-                return None
+                print >>sys.stderr, "Then it return np.Nan"
+#                 return np.nan
         return self.__cachedata[variable] if len(kwargs) == 0 else self.__filter(self.__cachedata[variable], kwargs=kwargs)
 
 
@@ -704,7 +722,7 @@ class arps():
         fmt = "%%%ds :: %%s" % (size)
         print fmt % ("Variable", "Description")
         print "-" * size,"  ","-"*len("Description")
-        for i in sort(self.__varname.keys()):
+        for i in np.sort(self.__varname.keys()):
             print( fmt % (i, str(self.__varname[i])) )
     def showatt(self):
         for i in self.__attributes:
@@ -727,6 +745,7 @@ class netcdf_serie():
     def __init__(self,files,model):
         self.dataframe=pd.DataFrame([])
         self.__modelserie(files,model)
+
     def __modelserie(self,files,model):
         for InPath in files:
             properties = FileProperties(InPath,model)
@@ -737,21 +756,87 @@ class netcdf_serie():
                 newdataframe = pd.DataFrame([charac.values()],columns=charac.keys(),index=[charac['time']])
                 newdataframe=newdataframe
                 self.dataframe=self.dataframe.append(newdataframe)
+
+
     def get(self,var,**kwargs):
         select=np.array(kwargs['select'])
         data=np.array([])
         dataframe= self.dataframe
+
+        if not isinstance(var, list):
+            var = [var]
+
+        data_file = pd.DataFrame(columns=var)
         for index,row in dataframe.iterrows(): # COULD USE AN APPLY FUNCTION
-            try:
-                ARPS = arps()
-                BASE = BaseVars(row['InPath'], row['model'])
-                ARPS.load(BASE)
-                print(index)
-                data=np.append(data,ARPS.get(var,select=select).data.flatten())
-            except AttributeError:
-                print("data dosent exist on file -> ", index)
-        dataframe[var]=pd.Series(data, index = dataframe.index)
+            print(index)
+            ARPS=None
+            BASE=None
+            
+            ARPS = arps()
+            
+
+            vars_file = {}
+            for v in var:
+                try:
+                    BASE = BaseVars(row['InPath'], row['model'])
+                    ARPS.load(BASE)
+                    
+                    d = ARPS.get(v, select=select)
+                    d = d.data.flatten()
+
+                    vars_file[v] = d
+                except KeyError:
+                    vars_file[v] =  np.array([np.NAN])
+                    print("data dosent exist on file -> ", index)
+                except ValueError:
+                    vars_file[v] = np.array([np.NAN])
+                    print("New type not compatible with nan")
+                except TypeError:
+                    vars_file[v] = np.array([np.NAN])
+                    print('Is not a compatible netcdf')
+
+            temp = pd.DataFrame(vars_file)
+            data_file = pd.concat([data_file, temp])
+
+        data_file.index = dataframe.index
+        dataframe = pd.concat([dataframe, data_file], axis=1)
         return dataframe
+# 
+#     def get(self,var,**kwargs):
+#         select=np.array(kwargs['select'])
+#         data=np.array([])
+#         dataframe= self.dataframe
+#         
+#         for index,row in dataframe.iterrows(): # COULD USE AN APPLY FUNCTION
+#             ARPS=None
+#             BASE=None
+#             print(index)
+#             ARPS = arps()
+#             try:
+#                 BASE = BaseVars(row['InPath'], row['model'])
+#                 ARPS.load(BASE)
+#                 d = ARPS.get(var,select=select)
+#                 print d
+#                 d = d.data.flatten()
+#                 print d
+#                 print "* "*80
+#                 data=np.append(data,d)
+# #                 ARPS.close()
+# #                 BASE.close()
+#             except KeyError:
+#                 data = np.append(data, np.NAN)
+#                 print("data dosent exist on file -> ", index)
+#             except ValueError:
+#                 data = np.append(data, np.NAN)
+#                 print("New type not compatible with nan")
+#             except TypeError:
+#                 data = np.append(data, np.NAN)
+#                 print('Is not a compatible netcdf')
+# 
+#         print data
+#         print dataframe.index
+#         dataframe[var]=pd.Series(data, index = dataframe.index)
+#         return dataframe
 
 
 

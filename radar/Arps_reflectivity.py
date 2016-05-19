@@ -1,9 +1,25 @@
-#!/usr/bin/python
+# DESCRIPTION
+#	Compute the reflectivity of the hydrometeors concentrations 
+#	from the Thompson microphysics scheme used by the ARPS model
+
+#	REFERENCES
+#	Equation used for the calculation of the hydrometeors distribution are explained in :
+#
+#	Thompson et al. 2004
+#	Explicit forecasts of winter precipitation using an improved bulk mi- crophysics scheme. Part I: Description and sensitivity analy- sis. 
+#	Mon. Wea. Rev
+#
+#	Thompson et al. 2008  
+#	Explicit Forecasts of Winter Precipitation Using an Improved Bulk Microphysics Scheme. Part I: Description and Sensitivity Analysis
+#	Monthly weather review
+#
+#	Author
+#	Thomas Martin, 2014
 #==================================================
 
-#=====================
-#===== Library
-#=====================
+#===============================================================================
+# Python Library
+#===============================================================================
 from __future__ import division # to be able to get a floatting point (for the divis
 import os.path # to check if the file exist 
 from scipy.io import netcdf
@@ -16,10 +32,9 @@ import matplotlib.gridspec as gridspec
 import csv
 
 
-
-#=======================
-#====== user Input
-#=======================
+#===============================================================================
+# User input
+#===============================================================================
 #var = raw_input("Enter arps input file (Netcdf format) #-> ")
 var = 'r300m.net039600'
 
@@ -39,6 +54,8 @@ ResoH=f.THISDMP# history frequency
 Initime_H=f.INITIAL_TIME[11:13]
 
 #------ Take variable from the file
+# This is not necessary with the new version of the code netcdf_lib
+# but I let it there as it helps to understand the equations
 Initime_YMD=f.INITIAL_TIME[:10]# take the Year/month/day of the simulation
 RunName=f.RUNNAME# name of the simulation
 CtrLon=f.CTRLON	# Longitude centre
@@ -69,9 +86,10 @@ U=f.variables['U']# wind
 V=f.variables['V']# wind 
 Hgt=f.variables['ZP'][0,:,:]# Elevation
 ZP=f.variables['ZP'][:,:,:]#Altitude of the point
+
 #------ Transform variable
-Lon_00=CtrLon-((len(y_stag[:])-1)/2)*(Dy/(110*1000))# Position du point en bas a droite SEE GEOPY !!!!! I made this for the radar
-Lat_00=CtrLat-((len(x_stag[:])-1)/2)*(Dx/(110*1000))# !!!!! jai approximer avec 110 km par degree!!! trouver une meilleur approximation
+Lon_00=CtrLon-((len(y_stag[:])-1)/2)*(Dy/(110*1000))# Position of the bottom right point SEE GEOPY !!!!! I made this for the radar
+Lat_00=CtrLat-((len(x_stag[:])-1)/2)*(Dx/(110*1000))# !!!!! I have made the approximation that 1Degree = 110km!!! IN the futur find a better approximation
 Lat=y_stag[1::]/110000+Lat_00
 Lon=x_stag[1::]/110000+Lon_00
 
@@ -79,11 +97,11 @@ Lon=x_stag[1::]/110000+Lon_00
 Rd= 287.05 # Specific gaz constant for dry air
 Rv= 461.495 # Specific gas constant for humid air 
 P0=100000
-Cp=1004.5#J/(kg K)
-rho_s=100
-rho_g=400
-rho_solid=917
-rho_w=1000
+Cp=1004.5 #heat capacity J/(kg K)
+rho_s=100 # density Snow
+rho_g=400 # density graupel
+rho_solid=917 # density Solid
+rho_w=1000 # density Water
 ki2=0.176# dielectric constant Ice
 kl2=0.930# Dielectric constant water
 
@@ -94,22 +112,26 @@ RTk=PTk[:,:,:,:]*(Pr*10**2/P0)**(Rd/Cp);
 
 #-------- Partial Pressure
 #vapor
-Prv=((Qv[:,:,:,:]*(Pr*10**2))/(0.622+Qv[:,:,:,:])) # Pa
+Prv=((Qv[:,:,:,:]*(Pr*10**2))/(0.622+Qv[:,:,:,:])) #(Pa)
 #Dry air
-Prd=Pr*10**2-Prv # Pa
+Prd=Pr*10**2-Prv # (Pa)
 
 #-------- Density Air (humid)
 Rho_air=Prd/(Rd*RTk) + Prv/(Rv*RTk)
 
-#======= Water reflectivity
-#------ Intercept parameters
-N0r=8*10**6# m-4
-N0s=3*10**6# m-4
-N0g=4*10**4# m-4
-conv=1*10**(-8) # N0x need to be in cm -4 et non en m-4 dans certaine equations
-conv2=1*10**(-3) # convert g to kg
-#----- Lambda parameters
+#===============================================================================
+# Distribution Parameters
+#===============================================================================
+#------ Intercept parameters (used in the Tompson scheme simulation)
+N0r=8*10**6# rain m-4
+N0s=3*10**6# snow m-4
+N0g=4*10**4# graupel m-4
 
+conv=1*10**(-8) # N0x need to be in cm -4 and not in m-4 in some equations
+conv2=1*10**(-3) # convert g to kg
+
+
+#----- Lambda parameters
 L_r=((math.pi*rho_w*conv2*N0r*conv)/(Rho_air*conv2*QR.data))**0.25 # Rain  
 L_s=((math.pi*rho_s*conv2*N0s*conv)/(Rho_air*conv2*QS.data))**0.25 # Snow
 L_g=((math.pi*rho_g*conv2*N0g*conv)/(Rho_air*conv2*QG.data))**0.25 # Graupel
@@ -142,29 +164,25 @@ L_g=((math.pi*rho_g*conv2*N0g*conv)/(Rho_air*conv2*QG.data))**0.25 # Graupel
 
 
 
+#===============================================================================
+# Compute the reflectivity of each hydrometeors and the total reflectivity
+#===============================================================================
 
-
-
-#########################################################################################
-#########################################################################################
-
-#------- Reflectivity Total
-
-Z_r=math.gamma(7)*N0r*(L_r*10**2)**-7
-Z_s=((ki2/kl2)*(rho_s/rho_solid)**2)*(math.gamma(7)*N0s*(L_s*10**2)**-7)
-Z_g=((ki2/kl2)*(rho_g/rho_solid)**2)*(math.gamma(7)*N0g*(L_g*10**2)**-7)
+Z_r=math.gamma(7)*N0r*(L_r*10**2)**-7 # Rain reflectivity
+Z_s=((ki2/kl2)*(rho_s/rho_solid)**2)*(math.gamma(7)*N0s*(L_s*10**2)**-7) # Snow reflectivity
+Z_g=((ki2/kl2)*(rho_g/rho_solid)**2)*(math.gamma(7)*N0g*(L_g*10**2)**-7) # Graupel reflectivity
 
 Z=Z_s+Z_g+Z_r
 
-Z=Z*10**18
-Z=10*np.log10(Z)
-Z[isnan(Z)]=0
-Z[isinf(Z)]=0
-Z[Z<0]=0
+Z=Z*10**18 # convert in DBZ
+Z=10*np.log10(Z) # convert in DBZ
+Z[isnan(Z)]=0 # Put zero where nan
+Z[isinf(Z)]=0 # Put zero where infinte value
+Z[Z<0]=0 # Put zero on negative values
 
-
-
-#=================== Comparison with Radar
+#===============================================================================
+# 2) RADAR
+#===============================================================================
 #------ Constant 
 Elev_angle=2.9
 # Earth radius (m)
@@ -222,13 +240,9 @@ for i in azimuths:
 
 H_rad=np.tile(H_pos,(360,1)).flatten()
 
-
-
-
-
-#########################################################################################
-#########################################################################################
-#============== Interpolate model value on radar position (Lat, lon, H)
+#===============================================================================
+# Interpolate model value on radar position (Lat, lon, H)
+#===============================================================================
 
 from scipy.interpolate import griddata
 import time
@@ -283,10 +297,9 @@ for idx in range(0,len(Lon_rad)):
 
 
 
-
-#########################################################################################
-#########################################################################################
-#########################################################################################
+#===============================================================================
+# 
+#===============================================================================
 import matplotlib.mlab as ml
 Lati = np.linspace(rad_Lat.min(),rad_Lat.max(),300)
 Loni = np.linspace(rad_Lon.min(),rad_Lon.max(),300)
