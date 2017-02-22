@@ -4,16 +4,18 @@ import subprocess
 # InPath="/dados2/gfs/"
 #Files=glob.glob(InPath+"*.grb2")
 
-# Ceux que j'ai utilisé pour faire la simulation avec assimilation
-InPath= "/dados2/arps/sim/realexp/run/inputdata/"
-Files=glob.glob(InPath+"*.grib2")
+# InPath= "/dados3/gfs/"
+# InPath= "/dados2/gfsZ24/"
+InPath= "/dados1/gfsZ96/"
+Files=glob.glob(InPath+"*.grb2")
 
 
 Files.sort()
-# Files = Files[390:]
 
 wgrib2Path='/home/thomas/PhD/arps/utility/grib2/wgrib2/wgrib2'
-  
+
+print Files
+
 for File in Files:
     print "%" * 100
     print File

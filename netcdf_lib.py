@@ -36,6 +36,9 @@ import functools
 import pandas as pd
 import scipy
 import sys
+import io
+from netCDF4 import Dataset
+import copy
 
 class SpecVar():
     Cst={"P0":100000,
@@ -66,7 +69,10 @@ class SpecVar():
             'Lon':self.__Lon,
             'Latgrid':self.__Latgrid,
             'Longrid':self.__Longrid,
-            'Tc':self.__Tc
+            'Tc':self.__Tc,
+            'z':self.__z,
+            'x':self.__x,
+            'y':self.__y,
         }
         self.attributes = { }
         self.varname = {
@@ -88,7 +94,24 @@ class SpecVar():
             'Latgrid':'matrix latitude',
             'Tc': 'Temperature in degree Celsius'
         }
-
+    def __z(self,arps):
+        """
+        WARNING
+            For the moment it is not looking for the true altitude but for the zstag
+        return altitude
+        """
+        return arps.get('z_stag')
+    def __y(self,arps):
+        """
+        return latitude
+        """
+        return arps.get('Lat')
+    def __x(self,arps):
+        """
+        return longitude
+        """
+        return arps.get('Lon')
+        
     def __QT(self, arps):
         """
         Calculate Total hydrometeors
@@ -101,7 +124,7 @@ class SpecVar():
         QC = arps.get('QC')
         QS = arps.get('QS')
 
-        data=QI.data + QH.data + QR.data + QC.data + QS.data
+        data=QI[:] + QH[:] + QR[:] + QC[:] + QS[:]
         result = scipy.io.netcdf.netcdf_variable(data, QI.typecode(),QI._size, QI.shape, QI.dimensions)
         result.long_name=self.varname['QT']
 
@@ -113,18 +136,19 @@ class SpecVar():
         print("Calculate Potential temperature in degree")
 
         PT=arps.get('PT')
-        data=PT.data-273.15
+        data=PT[:]-273.15
         results=scipy.io.netcdf.netcdf_variable(data,PT.typecode(),PT._size,PT.shape,PT.dimensions)
         results.long_name=self.varname['PTc']
         results.units='C'
         return results
+
     def __Phpa(self, arps):
         """
         Calculate the Pressure in hectopascale
         """
         print('Calculate the Pressure in Hectopascale')
         P=arps.get('P')
-        data=P.data*10**-2
+        data=P[:]*10**-2
         results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P._size,P.shape,P.dimensions)
         results.long_name=self.varname['Phpa']
         results.units='hpa'
@@ -135,7 +159,7 @@ class SpecVar():
         """
         print('Calculate the pressure in hectopascale')
         PBAR=arps.get('PBAR')
-        data=PBAR.data*10**-2
+        data=PBAR[:]*10**-2
         results=scipy.io.netcdf.netcdf_variable(data,PBAR.typecode(),PBAR._size,PBAR.shape,PBAR.dimensions)
         results.long_name=self.varname['Pbarhpa']
         results.units='hpa'
@@ -148,7 +172,7 @@ class SpecVar():
         print('calculate the totale pressur in hectopascale') 
         Phpa=arps.get('Phpa')
         Pbarhpa=arps.get('Pbarhpa')
-        data=Phpa.data+Pbarhpa.data
+        data=Phpa[:]+Pbarhpa[:]
         results=scipy.io.netcdf.netcdf_variable(data,Phpa.typecode(),Phpa._size,Phpa.shape,Phpa.dimensions)
         results.longname=self.varname['Ptot']
 
@@ -163,7 +187,7 @@ class SpecVar():
         QT=arps.get('QT')
         PT=arps.get('PT')
         QV=arps.get('QV')
-        data=PT.data*((1+(QV.data/Eps))/(1+QT.data))
+        data=PT[:]*((1+(QV[:]/Eps))/(1+QT[:]))
 
         results=scipy.io.netcdf.netcdf_variable(data,QT.typecode(),ThetaV._size,QT.shape,QT.dimensions)
         results.long_name=self.varname['ThetaV']
@@ -177,14 +201,15 @@ class SpecVar():
         print("Calculate the Real temperature in Kelvin")
         P=arps.get('P')
         PT=arps.get('PT')
-        data=PT.data*(P.data/self.Cst['P0'])**(self.Cst['Rd']/self.Cst['Cp'])
-        results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P._size,P.shape,P.dimensions)
-        results.long_name=self.varname['Tk']
-        results.units='k'
-        return results
+        data=PT[:]*(P[:]/self.Cst['P0'])**(self.Cst['Rd']/self.Cst['Cp'])
+#         results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P._size,P.shape,P.dimensions)
+#         results.long_name=self.varname['Tk']
+#         results.units='k'
+#         return results
+        return data
     def __Tc(self,arps):
         Tk=arps.get('Tk')
-        data=Tk.data-273.15
+        data=Tk[:]-273.15
         results=scipy.io.netcdf.netcdf_variable(data,Tk.typecode(),Tk._size,Tk.shape,Tk.dimensions)
         results.long_name=self.varname['Tc']
         results.units='C'
@@ -196,7 +221,7 @@ class SpecVar():
         print('Calculate the partial vapor Pressure')
         QV= arps.get('QV')
         P=arps.get('P')
-        data=((QV.data*(P.data))/(0.622+QV.data))
+        data=((QV[:]*(P[:]))/(0.622+QV[:]))
         results=scipy.io.netcdf.netcdf_variable(data,QV.typecode(),QV._size,QV.shape,QV.dimensions)
         results.long_name=self.varname['Pv']
         results.units='Pa'
@@ -209,7 +234,7 @@ class SpecVar():
         print('Calculate the partial dry air Pressure')
         Pv=arps.get('Pv')
         P=arps.get('P')
-        data=P.data-Pv.data
+        data=P[:]-Pv[:]
         results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P._size,P.shape,P.dimensions)
         results.long_name=self.varname['Pd']
         results.units='Pa'
@@ -222,7 +247,7 @@ class SpecVar():
         """
         print('Calculate the vapor pressure at saturation')
         Tk=arps.get('Tk')
-        data=6.112*np.exp(17.62*(Tk.data-273.15)/(243.12+(Tk.data-273.15)))*10**2
+        data=6.112*np.exp(17.62*(Tk[:]-273.15)/(243.12+(Tk[:]-273.15)))*10**2
         results=scipy.io.netcdf.netcdf_variable(data,Tk.typecode(),Tk._size,Tk.shape,Tk.dimensions)
         results .long_name=self.varname['Psat']
 
@@ -234,7 +259,7 @@ class SpecVar():
         print('Calculate the relative humidity')
         Pv=arps.get('Pv')
         Psat=arps.get('Psat')
-        data=(Pv.data/Psat.data)*100
+        data=(Pv[:]/Psat[:])*100
         results=scipy.io.netcdf.netcdf_variable(data,Pv.typecode(),Pv._size,Pv.shape,Pv.dimensions)
         results.long_name=self.varname['Rh']
         results.units='%'
@@ -250,10 +275,10 @@ class SpecVar():
         Pd=arps.get('PD')
         QV=arps.get('QV')
         Rh=arps.get('Rh')
-        rtc=QT.data*self.Cst['Cl']# Total hydrometeor 
-        First=Tk.data*(self.Cst['P0']/Pd.data)**(self.Cst['Rd']/(self.Cst['Cpd']+rtc))
-        Second=Rh**((-QV.data*self.Cst['Rv'])/(self.Cst['Cpd']+rtc))
-        Third=np.exp((self.Cst['Lv']*QV.data)/((self.Cst['Cpd']+rtc)*Tk.data))
+        rtc=QT[:]*self.Cst['Cl']# Total hydrometeor 
+        First=Tk[:]*(self.Cst['P0']/Pd[:])**(self.Cst['Rd']/(self.Cst['Cpd']+rtc))
+        Second=Rh**((-QV[:]*self.Cst['Rv'])/(self.Cst['Cpd']+rtc))
+        Third=np.exp((self.Cst['Lv']*QV[:])/((self.Cst['Cpd']+rtc)*Tk[:]))
         data=First*Second*Third
         results=scipy.io.netcdf.netcdf_variable(data,QV.typecode(),QV._size,QV.shape,QV.dimensions)
         results.long_name=self.varname['ThetaE']
@@ -277,13 +302,35 @@ class SpecVar():
         x_stag=arps.get('x_stag')
         y_stag=arps.get('y_stag')
 
-        pnyc = Proj(proj='lcc',datum='WGS84',lat_1=truelat1,lat_2=truelat2,lat_0=ctrlat,lon_0=ctrlon)
-        Lon_arps,Lat_arps= pnyc(x_stag[1:]-(x_stag[:].max())/2,y_stag[1:]-(y_stag[:].max())/2, inverse=True)
+        pnyc = Proj(proj='lcc', datum='WGS84', lat_1=truelat1, lat_2=truelat2, lat_0=ctrlat, lon_0=ctrlon)
+#         Lon_arps,Lat_arps= pnyc(x_stag[1:]-(x_stag[:].max())/2, y_stag[1:]-(y_stag[:].max())/2, inverse=True)
+#         print ctrlat
+#         print ctrlon
+#         print len(x_stag[:])
+#         print len(y_stag[:])
+        x = x_stag[1:] - x_stag[1:].max()/2 
+        y = y_stag[1:] - y_stag[1:].max()/2 
+#         
+#         print y
+#         
+#         print np.where(x == 0)
+#         print np.where(y == 0)
+#         print x_stag[:]
+        
+        Lon_arps,Lat_arps= pnyc(x, y, inverse=True)
+#         print Lon_arps
+#         print Lat_arps
+#         print Lon_arps
+#         print len(x_stag[:])
+        
+        
+        # THIS ONLY WORK WITH THE FIRST NETCDF
+#         Lat=scipy.io.netcdf.netcdf_variable(Lat_arps,x_stag.typecode(),x_stag._size,x_stag.shape[0]-1,x_stag.dimensions)
 
-        Lat=scipy.io.netcdf.netcdf_variable(Lat_arps,x_stag.typecode(),x_stag._size,x_stag.shape[0]-1,x_stag.dimensions)
-        Lat.long_name=self.varname['Lat']
+#         print len(Lat[:])
+#         Lat.long_name=self.varname['Lat']
 
-        return Lat
+        return Lat_arps
     def __Lon(self, arps):
         """
         Calculate the matrix latitude longitude of the domain
@@ -302,37 +349,49 @@ class SpecVar():
         y_stag=arps.get('y_stag')
         
         pnyc = Proj(proj='lcc',datum='WGS84',lat_1=truelat1,lat_2=truelat2,lat_0=ctrlat,lon_0=ctrlon)
-        Lon_arps,Lat_arps= pnyc(x_stag[1:]-(x_stag[:].max())/2,y_stag[1:]-(y_stag[:].max())/2, inverse=True)
+#         Lon_arps,Lat_arps= pnyc(x_stag[1:]-(x_stag[:].max())/2,y_stag[1:]-(y_stag[:].max())/2, inverse=True)
+#         Lon_arps,Lat_arps= pnyc(x_stag[1:]-(x_stag[:].max())/2,y_stag[1:]-(y_stag[:].max())/2, inverse=True)
 
-        Lon=scipy.io.netcdf.netcdf_variable(Lon_arps,y_stag.typecode(),y_stag._size,y_stag.shape[0]-1,y_stag.dimensions)
-        Lon.long_name=self.varname['Lon']
+        x = x_stag[1:] - x_stag[1:].max()/2 
+        y = y_stag[1:] - y_stag[1:].max()/2 
+
+        Lon_arps,Lat_arps= pnyc(x, y, inverse=True)
+
+#         Lon=scipy.io.netcdf.netcdf_variable(Lon_arps,y_stag.typecode(),y_stag._size,y_stag.shape[0]-1,y_stag.dimensions)
+#         Lon.long_name=self.varname['Lon']
         
-        return Lon
+        return Lon_arps
     def __Latgrid(self, arps):
         Lat=arps.get('Lat')
         Lon=arps.get('Lon')
         Z=arps.get('z_stag')
-        resLat,resLon=np.meshgrid(Lat.data,Lon.data)
-        resLat=transpose(resLat)
+        resLat,resLon=np.meshgrid(Lat[:],Lon[:])
+        resLat=np.transpose(resLat)
         Zarray=np.array([1]).repeat(Z.shape)
         resLat=Zarray[:,None,None]*resLat
         size=3
-        Latgrid=scipy.io.netcdf.netcdf_variable(resLat,Lat.typecode(),size,(Z.shape,Lat.shape,Lon.shape),(Z.dimensions,Lat.dimensions,Lon.dimensions))
-        Latgrid.long_name=self.varname['Latgrid']
-        return Latgrid
+#         Latgrid=scipy.io.netcdf.netcdf_variable(resLat,Lat.typecode(),size,(Z.shape,Lat.shape,Lon.shape),(Z.dimensions,Lat.dimensions,Lon.dimensions))
+#         Latgrid.long_name=self.varname['Latgrid']
+        return resLat
+        pass
 
     def __Longrid(self, arps):
         Lat=arps.get('Lat')
         Lon=arps.get('Lon')
+        
+        print Lon
+        
         Z=arps.get('z_stag')
-        resLat,resLon=np.meshgrid(Lat.data,Lon.data)
-        resLon=transpose(resLon)
+        resLat,resLon=np.meshgrid(Lat[:],Lon[:])
+        resLon=np.transpose(resLon)
         Zarray=np.array([1]).repeat(Z.shape)
         resLon=Zarray[:,None,None]*resLon
         size=3
-        Longrid=scipy.io.netcdf.netcdf_variable(resLon,Lon.typecode(),size,(Z.shape,Lat.shape,Lon.shape),(Z.dimensions,Lat.dimensions,Lon.dimensions))
-        return Longrid
+#         Longrid=scipy.io.netcdf.netcdf_variable(resLon,Lon.typecode(),size,(Z.shape,Lat.shape,Lon.shape),(Z.dimensions,Lat.dimensions,Lon.dimensions))
+        return resLon
+        pass
 
+    
 class FileProperties():
         def __init__(self,InPath,model):
             self.attributes={
@@ -345,50 +404,67 @@ class FileProperties():
 
         def __time(self,InPath,model):
             UTC=3 #Hour
-            print "*"*100
-            print "*"*100
+#             print "*"*100
+#             print "*"*100
             
-            try:
-                if model == "ARPS":
-                    filetime=int(os.path.basename(InPath)[-6:])
-    #                 initime=self.__dict__["INITIAL_TIME"] # need to be implemented
-                    initime ='2015-01-01_21:00:00'
-                    UTC=UTC*3600
-                    Init = datetime.datetime.strptime(initime, "%Y-%m-%d_%H:%M:%S")
-                    Fortime=datetime.timedelta(seconds=filetime)
-                    UTCtime=datetime.timedelta(seconds=UTC)
-                    Time=str(Init+Fortime-UTCtime)
-                    self.attributes['time']=Time
-        
-                if model == 'GFS':
-                    """
-                    ANALYSIS
-                    fnl_20150424_06_00.grib2.nc
-                    """
-                    filetime=os.path.basename(InPath)[4:18]
-                    Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H_%M")
-                    Time=Time-datetime.timedelta(hours=UTC)
-                    self.attributes['time']=Time
-    
-                if model == 'GFS_for':
-                    """
-                    From Nomade
-                    Forecast
-                    gfs_4_20140815_0000_000.grb2.nc
-                    """
-                    filetime=os.path.basename(InPath)[6:19]
-                    Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H%M")
-                    Time=Time-datetime.timedelta(hours=UTC)
-                    fortime=datetime.datetime.strptime(os.path.basename(InPath)[21:23], "%H")
-    
-                    self.attributes['time']=Time
-                    self.attributes['forecast']=fortime
-            except ValueError:
-                time = input("Enter UTC time in format->  %Y%m%d_%H_%M: ")
-                print "your tiped:"+ time
-                Time = datetime.datetime.strptime(time, "%Y%m%d_%H_%M")
+#             try:
+            if model == "ARPS":
+                filetime=int(os.path.basename(InPath)[-6:])
+#                     print self.__dict__
+#                     initime=self.__dict__["INITIAL_TIME"] # need to be implemented
+                initime ='2015-07-28_12:00:00' # UTC time
+#                 print "WARNING WITH INITIME"
+                UTC=UTC*3600
+                Init = datetime.datetime.strptime(initime, "%Y-%m-%d_%H:%M:%S")
+                Fortime=datetime.timedelta(seconds=filetime)
+                UTCtime=datetime.timedelta(seconds=UTC)
+                Time=str(Init+Fortime-UTCtime)
+                self.attributes['time']=Time
+                
+            if model == 'GFS':
+                """
+                ANALYSIS
+                fnl_20150424_06_00.grib2.nc
+                """
+                
+                filetime=os.path.basename(InPath)[4:18]
+#                     print filetime
+                Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H_%M")
                 Time=Time-datetime.timedelta(hours=UTC)
                 self.attributes['time']=Time
+
+            if model == "GFS_4":
+                """
+                ANALYSIS
+                gfs_4_20150102_0000_000.grb2.nc
+                """
+                filetime=os.path.basename(InPath)[6:19]
+                print "================================"
+                print filetime
+                Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H%M")
+                Time=Time-datetime.timedelta(hours=UTC)
+                self.attributes['time']=Time
+
+                
+            if model == 'GFS_for':
+                """
+                From Nomade
+                Forecast
+                gfs_4_20140815_0000_000.grb2.nc
+                """
+                filetime=os.path.basename(InPath)[6:19]
+                Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H%M")
+                Time=Time-datetime.timedelta(hours=UTC)
+                fortime=datetime.datetime.strptime(os.path.basename(InPath)[21:23], "%H")
+
+                self.attributes['time']=Time
+                self.attributes['forecast']=fortime
+#             except ValueError:
+#                 time = input("Enter UTC time in format->  %Y%m%d_%H_%M: ")
+#                 print "your tiped:"+ time
+#                 Time = datetime.datetime.strptime(time, "%Y%m%d_%H_%M")
+#                 Time=Time-datetime.timedelta(hours=UTC)
+#                 self.attributes['time']=Time
                     
                     
     
@@ -424,22 +500,45 @@ class BaseVars():
     model: Type of the model use: Arps or GFS
     """
     def __init__(self, InPath, model):
-        
 
-        f = netcdf.netcdf_file(InPath, 'r',mmap=True)# works with mmap= False but very slow
-        self.__dict__ = f.__dict__.copy() # copy the attributs of the object
-        self.__dict__['data'] = f.variables.copy()
-#         f.close() # MARCELO < - Should I close here ??
-        del(self.variables)
+#         f = netcdf.netcdf_file(InPath, 'r',mmap=True)# works with mmap= False but very slow
+#         print dir(f)
+#         self.__dict__ = f.__dict__.copy() # copy the attributs of the object
+#         self.__dict__['data'] = f.variables.copy()
+#         del(self.variables)
+#         self.module = { }
+#         self.varname = { }
+#         self.attributes = { }
+#         self.__properties(InPath, model)
+#         
+#         for att in f._attributes:
+# #             print att
+#             self.__setatt('attributes', att, f._attributes[att])
+#         self.__load(f)
+#         f.close() 
+#         self.__applymap(model)
+
+
+#------------------------------------------------------------------------------ 
+        f = Dataset(InPath, 'r')
+
+        self.__dict__ = dict(f.__dict__.copy())
+        self.__dict__['data'] = dict(f.variables.copy())
+           
+        dimensions ={}
+        for k in f.dimensions.keys():
+            dimensions[k] = f.dimensions[k].size
+        self.dimensions = dimensions
         self.module = { }
         self.varname = { }
         self.attributes = { }
         self.__properties(InPath, model)
-         
         self.__load(f)
-        f.close() # MARCELO < - Should I close here ??
-
+        for att in f.ncattrs():
+            self.__setatt('attributes', att, self.__dict__[att])
+         
         self.__applymap(model)
+        self.f = f
 
     def __properties(self,InPath,model):
         properties = FileProperties(InPath,model)
@@ -473,8 +572,7 @@ class BaseVars():
                        'UGRD_10maboveground':'U',
                        'SPFH_2maboveground':'QV',
                        'TCDC_entireatmosphere_consideredasasinglelayer_':'TCC',
-                       'TCDC_entireatmosphere':'TCDC_entireatmosphere_consideredasasinglelayer_',
-                       
+                       'TCDC_entireatmosphere':'TCDC_entireatmosphere_consideredasasinglelayer_'
                        }
             
         }
@@ -509,9 +607,6 @@ class BaseVars():
             #self.__setatt('module',  var, lambda x: self.__get(x,var))
             self.__setatt('module',  var, functools.partial(self.__get, variable = var)) 
             self.__setatt('varname', var, self.data[var].long_name)
-
-        for att in f._attributes:
-            self.__setatt('attributes', att, f._attributes[att])
 
     def __setatt(self,kind,name,value):
         """
@@ -563,9 +658,20 @@ class BaseVars():
             except KeyError:
                 print('This attribute does not exist')
 
-    def __get(self, arps, variable):
-        return self.data[variable]
+    def __get(self, arps, variable, data=None):
+        """
+        IN the NECTDF4 "data" does not exist so 
+        in this module I try if it exist if not I create it
+        """
+        if data:  
+            try:
+                return self.data[variable].data
+            except AttributeError:
+                return self[:][variable].__array__()
+        else:
+            return self.data[variable]
 
+ 
 
 class arps():
     def __init__(self):
@@ -576,19 +682,27 @@ class arps():
 
     def load(self, plugin):
         # module refeers to the variable or the function to calculate it
+        try:
+            self.f = plugin.f
+        except:
+            pass
+        
         for (k, v) in plugin.module.iteritems():
             if k in self.__knowvariables:
-                print >>sys.stderr,"%s is already know." % k
+                pass
+#                 print >>sys.stderr,"%s is already know." % k
             self.__knowvariables[k] = v
         # attributes are the characteristics of the file
         for (k,v) in plugin.attributes.iteritems():
             if k in self.__attributes:
-                print >>sys.stderr,"%s is already know." % k
+                pass
+#                 print >>sys.stderr,"%s is already know." % k
             self.__attributes[k] = v
             # varname is the longname of the variables in the file
         for (k,v) in plugin.varname.iteritems():
             if k in self.__varname:
-                print >>sys.stderr,"%s is already know." % k
+                pass
+#                 print >>sys.stderr,"%s is already know." % k
             self.__varname[k] = v
 
     def __findI(self,var,varlim):
@@ -616,75 +730,93 @@ class arps():
             obtained from mmapped Netcdf file if 
             they are to be processed after the file is closed, see the example below.
         """
+
         key="all"
-        select = np.array(kwargs['kwargs']['select'])
         
+        try:
+            select = np.array(kwargs['kwargs']['select'])
+            userdim = select.shape[0]# subset dimensions
+        except KeyError:
+            select =None
+        
+        try:
+            Iselect = np.array(kwargs['kwargs']['Iselect'])
+            userdim = Iselect.shape[0]# subset dimensions
+        except KeyError:
+            Iselect =None
+            
         
         olddim = data.dimensions
         newdim = []
         
-        userdim = select.shape[0]# subset dimensions
         lendim = len(olddim)
         
         if userdim != lendim: # check if the user gave the right number of parameters
+            print lendim
+            print userdim
             raise Exception ("Subset parameters %s do not agree with the data dimensions : %s !" % (userdim, lendim))
 
         # Double the parameter in case of same limit
-        for i,v in enumerate(select):
-            if len(v) ==1:
-                select[i].append(v[0])
-        
-        
-        Iselect = [ ]# Indice of the selection
-        for d,s in zip(olddim,select):
-            
-#             if diff(s) != 0: # Putain il sort d ou ce diff ?
-#                 newdim.append(d)
+        if Iselect == None:
+            newselect=[]
+            for sel in select:
+                if len(sel)==1:
+                    newselect.append([sel[0], sel[0]])
+                else:
+                    newselect.append(sel)
+            select = newselect
+    #         print select
+    
+    
+            Iselect = [ ]# Indice of the selection
+            for d,s in zip(olddim,select):
+    
+    #             if diff(s) != 0: # Putain il sort d ou ce diff ?
+    #                 newdim.append(d)
+    
 
-            print("dimensions %s",d)
-            print("user input %s",s)
+                if s[0] == key: # could improve the efficiency
+                    s[0] = min(self.get(d, data=True)) # MARCELO <- It the only way I found to solve a problem, what do you think about this
 
-            if s[0] == key: # could improve the efficiency
-                s[0] = min(self.get(d).data) # MARCELO <- It the only way I found to solve a problem, what do you think about this
+                if s[1] == key: # could improve the efficiency 
+                    s[1] = max(self.get(d, data=True))
+    
+    #             print 'quasi'
+    #             print d
+    #             print self.get(d)
+    #             print 'POUET'
+    #             print dir(self.get(d).data)
+                imin=self.__findI(self.get(d, data=True), s[0])
+                imax= self.__findI(self.get(d, data=True), s[1])
+                
+                # Le fait que imin peut etre plus grand que imax peut poser probleme
+                # Iselect= sorted([imin,imax])??
+                if imin < imax:
+                    Iselect.append([imin,imax])
+                elif imin == imax:
+                    Iselect.append([imin,imax+1])
+                else:
+                    Iselect.append([imax,imin])
 
-            if s[1] == key: # could improve the efficiency 
-                s[1] = max(self.get(d).data)
-            
-            imin=self.__findI(self.get(d).data, s[0])
-            imax= self.__findI(self.get(d).data, s[1])
-            
-            # Le fait que imin peut etre plus grand que imax peut poser probleme
-            # Iselect= sorted([imin,imax])??
-            if imin < imax:
-                Iselect.append([imin,imax])
-            elif imin == imax:
-                Iselect.append([imin,imax+1])
-            else:
-                Iselect.append([imax,imin])
+        try:
+            data = data
+        except:
+            data = data.__array__()
 
-        # creation new object
-        Newdata=data
-
-        print(lendim)
-        print(Iselect)
         if lendim == 1:
-            Newdata.data=data.data[Iselect[0][0]:Iselect[0][1]]
+            Newdata =data[Iselect[0][0]:Iselect[0][1]]
 
         if lendim == 2:
-            Newdata.data=data.data[Iselect[0][0]:Iselect[0][1],Iselect[1][0]:Iselect[1][1]]
+            Newdata =data[Iselect[0][0]:Iselect[0][1],Iselect[1][0]:Iselect[1][1]]
 
         if lendim == 3:
-            Newdata.data=data.data[Iselect[0][0]:Iselect[0][1],Iselect[1][0]:Iselect[1][1],Iselect[2][0]:Iselect[2][1]]
+            Newdata =data[Iselect[0][0]:Iselect[0][1],Iselect[1][0]:Iselect[1][1],Iselect[2][0]:Iselect[2][1]]
 
         if lendim ==4:
-            Newdata.data=data.data[Iselect[0][0]:Iselect[0][1],Iselect[1][0]:Iselect[1][1],Iselect[2][0]:Iselect[2][1],Iselect[3][0]:Iselect[3][1]]
+            Newdata =data[Iselect[0][0]:Iselect[0][1],Iselect[1][0]:Iselect[1][1],Iselect[2][0]:Iselect[2][1],Iselect[3][0]:Iselect[3][1]]
 
-        Newdata.select = np.array(select)
-        Newdata.Iselect = Iselect
-        Newdata.dimensions=newdim
 
         return Newdata
-
 
     def get(self,variable,**kwargs):
         """
@@ -699,23 +831,36 @@ class arps():
         except KeyError, e:
             # try if the variable is in the BASEVAR
             try:
+#                 print self.__knowvariables.keys()
                 fn = self.__knowvariables[variable]
+#                 print fn
                 data = fn(self)
+#                 print self.__knowvariables.keys()
                 self.__cachedata[variable] = data
             except KeyError,e:
                 print >>sys.stderr, "%s is not know,\n%s" % (variable, str(e))
                 print >>sys.stderr, "Then it return np.Nan"
-#                 return np.nan
-        return self.__cachedata[variable] if len(kwargs) == 0 else self.__filter(self.__cachedata[variable], kwargs=kwargs)
+                return np.array([np.nan])
 
-
+        
+        if 'select'in kwargs.keys():
+#             return self.__filter(self.__cachedata[variable], kwargs=kwargs)
+#             print self.showvar()
+            return self.__filter(self.__cachedata[variable], kwargs=kwargs)
+        elif 'Iselect'in kwargs.keys():
+#             return self.__filter(self.__cachedata[variable], kwargs=kwargs)
+#             print self.showvar()
+            return self.__filter(self.__cachedata[variable], kwargs=kwargs)
+    
+        else:
+            return self.__cachedata[variable]
+        
     def remove(self,variable):
         try:
             del self.__knowvariables[variable]
             del self.__cachedata[variable]
         except KeyError,e:
             print('The variable is not known')
-
     def showvar(self):
 
         size=max(max(map(len,self.__varname.keys())), len("Variable"))
@@ -739,7 +884,9 @@ class arps():
 
 # TEST 
 
-
+    def close(self):
+        self.f.close()
+        
 
 class netcdf_serie():
     def __init__(self,files,model):
@@ -759,85 +906,90 @@ class netcdf_serie():
 
 
     def get(self,var,**kwargs):
-        select=np.array(kwargs['select'])
-        data=np.array([])
-        dataframe= self.dataframe
 
+#         data=np.array([])
+        dataframe= self.dataframe
         if not isinstance(var, list):
             var = [var]
-
+            
         data_file = pd.DataFrame(columns=var)
         for index,row in dataframe.iterrows(): # COULD USE AN APPLY FUNCTION
-            print(index)
+#             print(index)
             ARPS=None
             BASE=None
             
             ARPS = arps()
-            
 
             vars_file = {}
             for v in var:
                 try:
                     BASE = BaseVars(row['InPath'], row['model'])
                     ARPS.load(BASE)
+                    SPEV = SpecVar()
+                    ARPS.load(BASE)
+                    ARPS.load(SPEV)
+    
+    #                 print select
+    #                 print 'aahaha'
+    #                 print v
+                    d = ARPS.get(v, **kwargs)
+
+                    d = d[:] # important
+
                     
-                    d = ARPS.get(v, select=select)
-                    d = d.data.flatten()
+                    d = d.flatten()
 
                     vars_file[v] = d
-                except KeyError:
-                    vars_file[v] =  np.array([np.NAN])
-                    print("data dosent exist on file -> ", index)
-                except ValueError:
-                    vars_file[v] = np.array([np.NAN])
-                    print("New type not compatible with nan")
-                except TypeError:
-                    vars_file[v] = np.array([np.NAN])
-                    print('Is not a compatible netcdf')
+                except IOError:
+                    vars_file[v] = np.array([np.nan])
 
+            ARPS.close()
             temp = pd.DataFrame(vars_file)
             data_file = pd.concat([data_file, temp])
 
         data_file.index = dataframe.index
         dataframe = pd.concat([dataframe, data_file], axis=1)
         return dataframe
-# 
-#     def get(self,var,**kwargs):
-#         select=np.array(kwargs['select'])
-#         data=np.array([])
-#         dataframe= self.dataframe
-#         
-#         for index,row in dataframe.iterrows(): # COULD USE AN APPLY FUNCTION
-#             ARPS=None
-#             BASE=None
-#             print(index)
-#             ARPS = arps()
-#             try:
-#                 BASE = BaseVars(row['InPath'], row['model'])
-#                 ARPS.load(BASE)
-#                 d = ARPS.get(var,select=select)
-#                 print d
-#                 d = d.data.flatten()
-#                 print d
-#                 print "* "*80
-#                 data=np.append(data,d)
-# #                 ARPS.close()
-# #                 BASE.close()
-#             except KeyError:
-#                 data = np.append(data, np.NAN)
-#                 print("data dosent exist on file -> ", index)
-#             except ValueError:
-#                 data = np.append(data, np.NAN)
-#                 print("New type not compatible with nan")
-#             except TypeError:
-#                 data = np.append(data, np.NAN)
-#                 print('Is not a compatible netcdf')
-# 
-#         print data
-#         print dataframe.index
-#         dataframe[var]=pd.Series(data, index = dataframe.index)
-#         return dataframe
 
+    def getdfmap(self,var,**kwargs):
+
+
+        dataframe= self.dataframe
+        if not isinstance(var, list):
+            var = [var]
+
+
+        data_file = pd.DataFrame()
+        for index,row in dataframe.iterrows(): # COULD USE AN APPLY FUNCTION
+            print(index)
+            ARPS=None
+            BASE=None
+            
+            ARPS = arps()
+
+            vars_file = {}
+            for v in var:
+                try:
+                    BASE = BaseVars(row['InPath'], row['model'])
+                    ARPS.load(BASE)
+                    SPEV = SpecVar()
+                    ARPS.load(BASE)
+                    ARPS.load(SPEV)
+
+                    d = ARPS.get(v, **kwargs)
+                    d = d[:] # important
+
+                    d = d.flatten()
+                    vars_file[v] = d
+                except IOError:
+                    vars_file[v] = np.array([np.nan])
+
+            temp = pd.DataFrame(vars_file)
+            data_file = pd.concat([data_file, temp],axis=1)
+
+        data_file = data_file.T
+        data_file.index = dataframe.index
+        return data_file
 
 
 class ArpsFigures():
@@ -849,12 +1001,12 @@ class ArpsFigures():
             'screen_width':1920,
             'screen_height':1080,
             'DPI':96,
-            'Latmin':self.arps.get('Lat').data.min(),
-            'Latmax':self.arps.get('Lat').data.max(),
-            'Lonmin':self.arps.get('Lon').data.min(),
-            'Lonmax':self.arps.get('Lon').data.max(),
-            'Altmin':self.arps.get('z_stag').data[0],
-            'Altmax':self.arps.get('z_stag').data[-1]
+            'Latmin':self.arps.get('Lat')[:].min(),
+            'Latmax':self.arps.get('Lat')[:].max(),
+            'Lonmin':self.arps.get('Lon')[:].min(),
+            'Lonmax':self.arps.get('Lon')[:].max(),
+            'Altmin':self.arps.get('z_stag')[:][0],
+            'Altmax':self.arps.get('z_stag')[:][-1]
             }
         self.__figwidth()
         self.__subtitle(arps)
@@ -901,8 +1053,8 @@ class ArpsFigures():
                 print(parameter+ ' by [default] dont exist')
     def __levels(self,varname):
         self.paradef['nlevel']=10# number of discrete variabel level
-        self.paradef['varmax']=int(self.arps.get(varname).data.max())
-        self.paradef['varmin']=int(self.arps.get(varname).data.min())
+        self.paradef['varmax']=int(self.arps.get(varname)[:].max())
+        self.paradef['varmin']=int(self.arps.get(varname)[:].min())
         varmax=self.getpara('varmax')
         varmin=self.getpara('varmin')
         nlevel=self.getpara('nlevel')
@@ -922,7 +1074,7 @@ class ArpsFigures():
         ILonmax=self.getpara('ILonmax')
         IAltmin=self.getpara('IAltmin')
         IAltmax=self.getpara('IAltmax')
-        data=self.arps.get(varname).data
+        data=self.arps.get(varname)[:]
         selected='4d variable selected'
         
         if ILatmin == ILatmax:
@@ -984,9 +1136,9 @@ class ArpsFigures():
         Latmax=self.getpara('Latmax')
         Altmin=self.getpara('Altmin')
         Altmax=self.getpara('Altmax')
-        Lat=self.arps.get('Lat').data
-        Lon=self.arps.get('Lon').data
-        Alt=self.arps.get('z_stag').data[:]
+        Lat=self.arps.get('Lat')[:]
+        Lon=self.arps.get('Lon')[:]
+        Alt=self.arps.get('z_stag')[:][:]
         #=======================================================================
         # Find indices to select the needed domain
         #=======================================================================
@@ -1045,10 +1197,10 @@ class ArpsFigures():
         indice=min(range(len(var)), key=lambda i: abs(var[i]-varlim))
         return indice
     def __contour(self,varname):
-        var=self.getvar(varname)
-        lon=self.getvar('Longrid')
-        lat=self.getvar('Latgrid')
-        alt=self.getvar('ZP')
+        var=self.getvar(varname)[:]
+        lon=self.getvar('Longrid')[:]
+        lat=self.getvar('Latgrid')[:]
+        alt=self.getvar('ZP')[:]
         try:
             self.para['Altcross']
             X=lon
@@ -1068,20 +1220,22 @@ class ArpsFigures():
                     select="Vertical North South cross section is being plotted"
                 except:
                     print('Their is a problem on the ploting module - ask your mom')
-        print(select)
-        print(X.shape)
-        print(Y.shape)
-        print(var.shape)
+#         print(select)
+#         print(X.shape)
+#         print(Y.shape)
+#         print(var.shape)
         levels=self.__levels(varname)
         return [X,Y,var,levels]
     def contourf(self,varname):
         [X,Y,var,levels]=self.__contour(varname)
-        plot=plt.contourf(X,Y,var,cmap=get_cmap('BuRd'),levels=levels)
+        plot=plt.contourf(X,Y,var,cmap='coolwarm',levels=levels)
+#         plot=plt.contourf(X,Y,var,cmap='inferno',levels=levels)
         return plot
     def contour(self,varname):
         [X,Y,var,levels]=self.__contour(varname)
-#         plot=plt.contourf(X,Y,var,cmap=get_cmap('BuRd'),levels=levels)
-        plot=plt.contour(X,Y,var,levels=levels,cmap=get_cmap('gist_gray'))
+#         plot=plt.contourf(X,Y,var,cmap='inferno',levels=levels)
+#         plot=plt.contour(X,Y,var,levels=levels,cmap='Greys')
+        plot=plt.contour(X,Y,var,levels=levels, colors='k')
         return plot
     def windvector(self):
         """
@@ -1132,7 +1286,7 @@ class ArpsFigures():
         Vp=V[::Nbarb,::Nbarb]
         Xp=X[::Nbarb,::Nbarb]
         Yp=Y[::Nbarb,::Nbarb]
-        #plot=plt.barbs(Xp,Yp,Up,Vp,length=Lbarb, barbcolor=['k'],pivot='middle',sizes=dict(emptybarb=0))
+#         plot=plt.barbs(Xp,Yp,Up,Vp,length=Lbarb, barbcolor=['k'],pivot='middle',sizes=dict(emptybarb=0))
         plot=plt.quiver(Xp,Yp,Up,Vp)
         return plot
 
@@ -1196,10 +1350,10 @@ class ArpsFigures2():
         return paradef
 
     def fitcoordinate(self, p, var):
-        p['Latmin'] = self.arps.get(var).data.min()
-        p['Latmax'] = self.arps.get(var).data.max()
-        p['Lonmin'] = self.arps.get('Lon').data.min()
-        p['Lonmax'] = self.arps.get('Lon').data.max()
+        p['Latmin'] = self.arps.get(var)[:].min()
+        p['Latmax'] = self.arps.get(var)[:].max()
+        p['Lonmin'] = self.arps.get('Lon')[:].min()
+        p['Lonmax'] = self.arps.get('Lon')[:].max()
         return p
 
     def contourf(self, param, variables, prefix = None):

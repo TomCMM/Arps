@@ -16,30 +16,30 @@
 
 import urllib
 
-# ===== USER INPUT
-InPath="http://ftpprd.ncep.noaa.gov/data/nccf/com/gfs/prod/"
-OutPath="/data1/arps/dataI/gfs/12-17_12_2013/"
-
-month=12
-day=01# start at 01 and end at 30 or 31
-hour=['00','06','12','18']
-fhour=['06']#forecast hour
-ForJ=25#for X jour -> min 1 jour
-
-for j in range(0,ForJ):
-	for h in hour:
-		for fh in fhour:
-			# ===== DL data
-			folder="gfs.2013"+str(month)+str(day+j).zfill(2)+str(h)+"/"
-			filename="gfs.t"+str(h)+"z.pgrb2f"+fh
-			url=InPath+folder+filename
-			#download
-			print("======")
-			print("downloading"+" from:  " + InPath)
-			print("folder:->"+ folder)
-			print("file:->"+filename)
-			urllib.urlretrieve(url, OutPath+str(month)+str(day+j).zfill(2)+"-"+filename)
-			print("download successful !!!")
+# # ===== USER INPUT
+# InPath="http://ftpprd.ncep.noaa.gov/data/nccf/com/gfs/prod/"
+# OutPath="/data1/arps/dataI/gfs/12-17_12_2013/"
+# 
+# month=12
+# day=01# start at 01 and end at 30 or 31
+# hour=['00','06','12','18']
+# fhour=['06']#forecast hour
+# ForJ=25#for X jour -> min 1 jour
+# 
+# for j in range(0,ForJ):
+# 	for h in hour:
+# 		for fh in fhour:
+# 			# ===== DL data
+# 			folder="gfs.2013"+str(month)+str(day+j).zfill(2)+str(h)+"/"
+# 			filename="gfs.t"+str(h)+"z.pgrb2f"+fh
+# 			url=InPath+folder+filename
+# 			#download
+# 			print("======")
+# 			print("downloading"+" from:  " + InPath)
+# 			print("folder:->"+ folder)
+# 			print("file:->"+filename)
+# 			urllib.urlretrieve(url, OutPath+str(month)+str(day+j).zfill(2)+"-"+filename)
+# 			print("download successful !!!")
 
 
 
@@ -53,47 +53,13 @@ for j in range(0,ForJ):
 
 import urllib
 
-OutPath="/dados2/gfs/"
-
-years=map(str,[2014])
-months=map(str,range(01,12))
-days=map(str,range(1,32))
-hours=map(str,range(0,27,3))
-
-for year in years: 
-	for month in months:
-		month=month.zfill(2)
-		for day in days:
-			day=day.zfill(2)
-			for hour in hours:
-
-# 				for fhour in hours:
-				base="http://nomads.ncdc.noaa.gov/data/gfs4/"
-				dirfolder = year+month
-				subfolder = year+month+day
-				filename = "gfs_4_"+year+month+day+"_"+hour.rjust(2,'0').ljust(4,'0')+"_"+'12'.zfill(3)+".grb2"
-				url=base+dirfolder+"/"+subfolder+"/"+filename
-				print(url)
-				try:
-					print("======")
-					print("downloading"+" from:  " + url)
-					urllib.urlretrieve(url,OutPath+filename)
-					print("download successful !!!")
-				except:
-					print('Not such file or directory')
-
-
-
-
-
-import urllib
-
-OutPath="/dados2/gfs/"
+OutPath="/dados1/gfsZ96/"
 
 years=map(str,[2015])
-months=map(str,range(06,12))
+months=map(str,range(1,13))
 days=map(str,range(1,32))
-hours=map(str,range(0,27,3))
+hours=map(str,range(0,24,6))
+fhour='96' # forecast hours
 
 for year in years: 
 	for month in months:
@@ -106,7 +72,7 @@ for year in years:
 				base="http://nomads.ncdc.noaa.gov/data/gfs4/"
 				dirfolder = year+month
 				subfolder = year+month+day
-				filename = "gfs_4_"+year+month+day+"_"+hour.rjust(2,'0').ljust(4,'0')+"_"+'12'.zfill(3)+".grb2"
+				filename = "gfs_4_"+year+month+day+"_"+hour.rjust(2,'0').ljust(4,'0')+"_"+fhour.zfill(3)+".grb2"
 				url=base+dirfolder+"/"+subfolder+"/"+filename
 				print(url)
 				try:
@@ -114,11 +80,47 @@ for year in years:
 					print("downloading"+" from:  " + url)
 					urllib.urlretrieve(url,OutPath+filename)
 					print("download successful !!!")
-				except:
-					print('Not such file or directory')
+				except IOError:
+					print("======")
+					print('Not such file or directory: '+ url)
 
 
-				
+
+
+
+# import urllib
+# 
+# OutPath="/dados2/gfs/"
+# 
+# years=map(str,[2015])
+# months=map(str,range(06,12))
+# days=map(str,range(1,32))
+# hours=map(str,range(0,27,3))
+# 
+# for year in years: 
+# 	for month in months:
+# 		month=month.zfill(2)
+# 		for day in days:
+# 			day=day.zfill(2)
+# 			for hour in hours:
+# 
+# # 				for fhour in hours:
+# 				base="http://nomads.ncdc.noaa.gov/data/gfs4/"
+# 				dirfolder = year+month
+# 				subfolder = year+month+day
+# 				filename = "gfs_4_"+year+month+day+"_"+hour.rjust(2,'0').ljust(4,'0')+"_"+'12'.zfill(3)+".grb2"
+# 				url=base+dirfolder+"/"+subfolder+"/"+filename
+# 				print(url)
+# 				try:
+# 					print("======")
+# 					print("downloading"+" from:  " + url)
+# 					urllib.urlretrieve(url,OutPath+filename)
+# 					print("download successful !!!")
+# 				except:
+# 					print('Not such file or directory')
+# 
+# 
+# 				
 				
 				
 				
