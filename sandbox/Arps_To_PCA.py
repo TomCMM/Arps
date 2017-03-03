@@ -66,58 +66,58 @@ if __name__=='__main__':
 
  
   
-  
-#     df = pickle.load( open( "/home/thomas/pca/df_pca_arps.p", "rb" ) )
-    df = pd.read_csv('/home/thomas/pca_surface/df_pca_arps.csv', index_col=0)
-    df.columns= range(len(df.columns))
-    df = df-273.15
-
- 
-#       
-#     rngs = np.linspace(10000,1000000,5)
-#     comp_times=[]
-#     for rng in rngs:
-#     start_time = time.time()
-    stamod = StaMod(df, None)
-    stamod.pca_transform(nb_PC=4, standard=False, center=False, sklearn=True)
-    
-    
-#     print("--- %s seconds ---" % (time.time() - start_time))
-#     stamod.plot_scores_ts()
+#   
+# #     df = pickle.load( open( "/home/thomas/pca/df_pca_arps.p", "rb" ) )
+#     df = pd.read_csv('/home/thomas/pca_surface/df_pca_arps.csv', index_col=0)
+#     df.columns= range(len(df.columns))
+#     df = df-273.15
+# 
+#  
+# #       
+# #     rngs = np.linspace(10000,1000000,5)
+# #     comp_times=[]
+# #     for rng in rngs:
+# #     start_time = time.time()
+#     stamod = StaMod(df, None)
+#     stamod.pca_transform(nb_PC=4, standard=False, center=False, sklearn=True)
+#     
+#     
+# #     print("--- %s seconds ---" % (time.time() - start_time))
+# #     stamod.plot_scores_ts()
+# #     plt.show()
+# #     stamod.plot_exp_var()
+# #     plt.show()
+#     print stamod.eigenvectors
+#     print stamod.eigenvectors.shape
+#     loadings = stamod.eigenvectors
+#     
+#     
+#     
+#     plt.subplot(221)
+#     plt.plot(loadings.T)
+# #     print loadings
+# #     loadings.plot()
+#         
+#     PCs = stamod.scores
+#     print PCs.shape
+#     print PCs
+#        
+#     
+#     plt.subplot(222)
+#     PC1 = PCs.loc[:,1].reshape((1002, 1002))
+#     plt.contourf(PC1, levels=np.linspace(PC1.min(), PC1.max(),50))
+#     plt.colorbar()
+#     
+#     plt.subplot(223)
+#     PC2 = PCs.loc[:,2].reshape((1002, 1002))
+#     plt.contourf(PC2, levels=np.linspace(PC2.min(), PC2.max(),50))
+#     plt.colorbar()
+#     
+#     plt.subplot(224)
+#     PC3 = PCs.loc[:,3].reshape((1002, 1002))
+#     plt.contourf(PC3, levels=np.linspace(PC3.min(), PC3.max(),50))
+#     plt.colorbar()
 #     plt.show()
-#     stamod.plot_exp_var()
-#     plt.show()
-    print stamod.eigenvectors
-    print stamod.eigenvectors.shape
-    loadings = stamod.eigenvectors
-    
-    
-    
-    plt.subplot(221)
-    plt.plot(loadings.T)
-#     print loadings
-#     loadings.plot()
-        
-    PCs = stamod.scores
-    print PCs.shape
-    print PCs
-       
-    
-    plt.subplot(222)
-    PC1 = PCs.loc[:,1].reshape((1002, 1002))
-    plt.contourf(PC1, levels=np.linspace(PC1.min(), PC1.max(),50))
-    plt.colorbar()
-    
-    plt.subplot(223)
-    PC2 = PCs.loc[:,2].reshape((1002, 1002))
-    plt.contourf(PC2, levels=np.linspace(PC2.min(), PC2.max(),50))
-    plt.colorbar()
-    
-    plt.subplot(224)
-    PC3 = PCs.loc[:,3].reshape((1002, 1002))
-    plt.contourf(PC3, levels=np.linspace(PC3.min(), PC3.max(),50))
-    plt.colorbar()
-    plt.show()
 #           
 #     PC4 = PCs.loc[:,4].reshape((1002, 1002))
 #     plt.contourf(PC4, levels=np.linspace(PC4.min(), PC4.max(),50))
