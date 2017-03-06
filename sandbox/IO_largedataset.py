@@ -61,39 +61,81 @@ if __name__ =='__main__':
 #         print store1
 #         store1.close()
         
-        #=======================================================================
-        # Transform TO temperature
-        #=======================================================================
-#         storeP = pd.HDFStore('/home/thomas/phd/statmod/data/model_data/P_store.h5')
-#         storePT = pd.HDFStore('/home/thomas/phd/statmod/data/model_data/PT_store.h5')
-        storeTk = pd.HDFStore('/home/thomas/phd/statmod/data/model_data/Tk_store.h5')
-#         
-#         for i,(Pkey, PTkey) in enumerate(zip(storeP.keys(), storePT.keys())):
-#             print Pkey
-#             storeTk['df_tk'+str(i)] = Tk(storeP[Pkey], storePT[PTkey])
-        print storeTk 
-        
-        #=======================================================================
-        # Incremental PCA with chunck of data
-        #=======================================================================
+#         #=======================================================================
+#         # Transform TO temperature
+#         #=======================================================================
+# #         storeP = pd.HDFStore('/home/thomas/phd/statmod/data/model_data/P_store.h5')
+# #         storePT = pd.HDFStore('/home/thomas/phd/statmod/data/model_data/PT_store.h5')
+#         storeTk = pd.HDFStore('/home/tom/phd/model_data/Tk_store.h5')
+        newstoreTk = pd.HDFStore('/home/tom/phd/model_data/new_Tk_store.h5')
+# # #         
+# # #         for i,(Pkey, PTkey) in enumerate(zip(storeP.keys(), storePT.keys())):
+# # #             print Pkey
+# # #             storeTk['df_tk'+str(i)] = Tk(storeP[Pkey], storePT[PTkey])
+# #         onepoint = pd.HDFStore('/home/tom/phd/model_data/onepoint.h5')
+# # #         df = pd.Series()
+#         for key in storeTk.keys():
+#             print key
+#             print storeTk[key].T.iloc[:,:].shape
+#             newstoreTk[key] = storeTk[key].T[storeTk[key].T.min(axis=1) > 200].T
 
+#             newstoretk = storeTk[key].T[]
+#             
+# #             print type(select.index)
+# # #             print select.shape()
+# #             select.plot()
+#             plt.show()
+# #             df = df.append(select)
+# 
+# #         onepoint['onepoint'] = df
+# #         df.plot()
+# #         plt.show()
+# #             
+#             
+#         #=======================================================================
+#         # Incremental PCA with chunck of data
+#         #=======================================================================
+# 
         n_components = 10
         ipca = IncrementalPCA(n_components=n_components)
-        for key in storeTk.keys():
+        keys = newstoreTk.keys()
+        for key in keys:
             print key
-            print storeTk[key].shape
-            ipca.partial_fit(storeTk[key].T)
+            print newstoreTk[key].T.shape
+#             plt.show()
+            
+            ipca.partial_fit(newstoreTk[key].T)
         print ('Number of Samples Seen:',ipca.n_samples_seen_ )
         print ('Explained variance by %d PCs:' %n_components, np.sum(ipca.explained_variance_ratio_))
 
-        #=======================================================================
-        # Plot loading
-        #=======================================================================
+        pc_component = pd.HDFStore('/home/tom/phd/model_data/pc_component.h5')
+        pc_component["pc_component"] = pd.DataFrame(ipca.components_.T) 
 
-        loading = ipca.components_.T[:,3].reshape((1201, 1201))
-        plt.contourf(loading, levels=np.linspace(loading.min(), loading.max(),50))
-        plt.colorbar()
-        plt.show()
+#         #=======================================================================
+#         # Plot loading
+#         #=======================================================================
+
+
+#         loading = ipca.components_.T[:,0].reshape((1201, 1201))
+#         loading = loading.iloc[]
+#         plt.contourf(loading, levels=np.linspace(loading.min(), loading.max(),50))
+#         plt.colorbar()
+#         plt.show()
+# 
+#         loading = ipca.components_.T[:,1].reshape((1201, 1201))
+#         plt.contourf(loading, levels=np.linspace(loading.min(), loading.max(),50))
+#         plt.colorbar()
+#         plt.show()
+#          
+#         loading = ipca.components_.T[:,2].reshape((1201, 1201))
+#         plt.contourf(loading, levels=np.linspace(loading.min(), loading.max(),50))
+#         plt.colorbar()
+#         plt.show()
  
+#         loading = ipca.components_.T[:,3].reshape((1201, 1201))
+#         plt.contourf(loading, levels=np.linspace(loading.min(), loading.max(),50))
+#         plt.colorbar()
+#         plt.show()
+# #  
 
         
