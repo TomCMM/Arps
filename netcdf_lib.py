@@ -125,10 +125,10 @@ class SpecVar():
         QS = arps.get('QS')
 
         data=QI[:] + QH[:] + QR[:] + QC[:] + QS[:]
-        result = scipy.io.netcdf.netcdf_variable(data, QI.typecode(),QI._size, QI.shape, QI.dimensions)
-        result.long_name=self.varname['QT']
-
-        return result
+#         result = scipy.io.netcdf.netcdf_variable(data, QI.typecode(),QI._size, QI.shape, QI.dimensions)
+#         result.long_name=self.varname['QT']
+        return data
+#         return result
     def __PTc(self, arps):
         """
         Calculate Potential temperature in degree
@@ -210,10 +210,10 @@ class SpecVar():
     def __Tc(self,arps):
         Tk=arps.get('Tk')
         data=Tk[:]-273.15
-        results=scipy.io.netcdf.netcdf_variable(data,Tk.typecode(),Tk._size,Tk.shape,Tk.dimensions)
-        results.long_name=self.varname['Tc']
-        results.units='C'
-        return results
+#         results=scipy.io.netcdf.netcdf_variable(data,Tk.typecode(),Tk._size,Tk.shape,Tk.dimensions)
+#         results.long_name=self.varname['Tc']
+#         results.units='C'
+        return data
     def __Pv(self, arps):
         """
         Calculate the vapor Pressure
@@ -411,8 +411,8 @@ class FileProperties():
             if model == "ARPS":
                 filetime=int(os.path.basename(InPath)[-6:])
 #                     print self.__dict__
-#                     initime=self.__dict__["INITIAL_TIME"] # need to be implemented
-                initime ='2015-07-28_12:00:00' # UTC time
+#                 initime=self.__dict__["INITIAL_TIME"] # need to be implemented
+                initime ='2015-11-10_12:00:00' # UTC time
 #                 print "WARNING WITH INITIME"
                 UTC=UTC*3600
                 Init = datetime.datetime.strptime(initime, "%Y-%m-%d_%H:%M:%S")
@@ -445,6 +445,17 @@ class FileProperties():
                 Time=Time-datetime.timedelta(hours=UTC)
                 self.attributes['time']=Time
 
+            if model == "fnl":
+                """
+                ANALYSIS
+                fnl_20150101_00_00.grib2.nc
+                """
+                filetime=os.path.basename(InPath)[4:15]
+                print "================================"
+                print filetime
+                Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H")
+                Time=Time-datetime.timedelta(hours=UTC)
+                self.attributes['time']=Time
                 
             if model == 'GFS_for':
                 """
@@ -904,7 +915,6 @@ class netcdf_serie():
                 newdataframe=newdataframe
                 self.dataframe=self.dataframe.append(newdataframe)
 
-
     def get(self,var,**kwargs):
 
 #         data=np.array([])
@@ -1053,11 +1063,16 @@ class ArpsFigures():
                 print(parameter+ ' by [default] dont exist')
     def __levels(self,varname):
         self.paradef['nlevel']=10# number of discrete variabel level
-        self.paradef['varmax']=int(self.arps.get(varname)[:].max())
-        self.paradef['varmin']=int(self.arps.get(varname)[:].min())
+        self.paradef['varmax']=self.arps.get(varname)[:].max()
+        self.paradef['varmin']=self.arps.get(varname)[:].min()
         varmax=self.getpara('varmax')
         varmin=self.getpara('varmin')
         nlevel=self.getpara('nlevel')
+        
+#         if varmin == 0 and varmax ==0:
+#             varmax=1
+#         print varmax
+#         print varmin
         levels=np.linspace(varmin,varmax,nlevel)
         return levels
     def getvar(self,varname):
@@ -1228,7 +1243,11 @@ class ArpsFigures():
         return [X,Y,var,levels]
     def contourf(self,varname):
         [X,Y,var,levels]=self.__contour(varname)
-        plot=plt.contourf(X,Y,var,cmap='coolwarm',levels=levels)
+        try:
+            plot=plt.contourf(X,Y,var,cmap='coolwarm',levels=levels)
+        except:
+            plot=plt.contourf(X,Y,var,cmap='coolwarm')
+#             pass
 #         plot=plt.contourf(X,Y,var,cmap='inferno',levels=levels)
         return plot
     def contour(self,varname):

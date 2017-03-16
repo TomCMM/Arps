@@ -5,8 +5,8 @@
 #===============================================================================
 import sys
 import pandas as pd
-from netcdf_lib import *
-from LCBnet_lib import *
+from arps_lib.netcdf_lib import *
+from clima_lib.LCBnet_lib import *
 
 sys.path.append('/home/thomas/PhD/arps/Arps')
 sys.path.append('/home/thomas/PhD/climaP/LCB-net')
@@ -112,7 +112,8 @@ def Tk(P, PT):
 #        "TMP_0D1M0D4mbelowground",
 #        "TMP_0D4M1mbelowground",
 #        "TMP_0D995sigmalevel",
-#        "TMP_0M0D1mbelowground",
+#        "TMP_0M0D1mbelowground",    From = "2015-03-01 00:00:00"
+    To = "2015-11-15 00:00:00"
 #        "TMP_100maboveground",
 #        "TMP_1829mabovemeansealevel",
 #        "TMP_2743mabovemeansealevel",
@@ -369,7 +370,7 @@ if __name__=='__main__':
 #===============================================================================
 
 #     InPath="/dados3/gfs/netcdf/"
-    InPath="/dados2/gfsZ24/"
+    InPath="/dados2/gfs/fnl/2014/"
        
     Files = glob.glob(InPath+"*nc")
     Files.sort()
@@ -382,7 +383,7 @@ if __name__=='__main__':
        
 #     Files =['/dados3/gfs/gfs_4_20150102_0000_000.grb2.nc']
        
-    model='GFS_4'
+    model='fnl'
        
     ARPS = arps()
     BASE = BaseVars(Files[0], model)
@@ -397,18 +398,18 @@ if __name__=='__main__':
 #     # T = pd.read_csv('/home/thomas/serie.csv')
 #     # T = T.append(Serie.get('TMP_1000mb',select=[[0],[-22.86],[360-46.28,360-46.29]]))
 # #     df = Serie.get(['TMP_950mb', "VVEL_950mb", "RH_950mb", "HGT_950mb","CLWMR_500mb" ],select=[[0],[-22.86],[360-46.28,360-46.29]])
-#     df = Serie.get(['TMP_2maboveground', 'TMP_80maboveground','TMP_950mb','TMP_900mb', 'TMP_850mb','TMP_800mb' ,'TMP_750mb','TMP_700mb','TMP_650mb','TMP_600mb','TMP_550mb','TMP_500mb',
-#                     'RH_2maboveground','RH_80maboveground','RH_950mb','RH_900mb', 'RH_850mb','RH_800mb','RH_750mb', 'RH_700mb','RH_650mb','RH_600mb', 'RH_550mb','RH_500mb',
-#                     'UGRD_10maboveground', 'UGRD_80maboveground','UGRD_950mb','UGRD_900mb', 'UGRD_850mb', 'UGRD_800mb','UGRD_750mb', 'UGRD_700mb', 'UGRD_650mb','UGRD_600mb', 'UGRD_550mb', 'UGRD_500mb',
-#                     'VGRD_10maboveground', 'VGRD_80maboveground','VGRD_950mb','VGRD_900mb', 'VGRD_850mb','VGRD_800mb','VGRD_750mb', 'VGRD_700mb','VGRD_650mb','VGRD_600mb', 'VGRD_550mb','VGRD_500mb',
-#                     'PRES_surface', 'PRES_80maboveground','HGT_950mb','HGT_900mb','HGT_850mb','HGT_800mb','HGT_750mb','HGT_700mb','HGT_650mb','HGT_600mb','HGT_550mb','HGT_500mb' ]
-#                    ,select=[[0],[-22.86],[360-46.28,360-46.29]])
+    df = Serie.get(['TMP_2maboveground', 'TMP_80maboveground','TMP_950mb','TMP_900mb', 'TMP_850mb','TMP_800mb' ,'TMP_750mb','TMP_700mb','TMP_650mb','TMP_600mb','TMP_550mb','TMP_500mb',
+                    'RH_2maboveground','RH_80maboveground','RH_950mb','RH_900mb', 'RH_850mb','RH_800mb','RH_750mb', 'RH_700mb','RH_650mb','RH_600mb', 'RH_550mb','RH_500mb',
+                    'UGRD_10maboveground', 'UGRD_80maboveground','UGRD_950mb','UGRD_900mb', 'UGRD_850mb', 'UGRD_800mb','UGRD_750mb', 'UGRD_700mb', 'UGRD_650mb','UGRD_600mb', 'UGRD_550mb', 'UGRD_500mb',
+                    'VGRD_10maboveground', 'VGRD_80maboveground','VGRD_950mb','VGRD_900mb', 'VGRD_850mb','VGRD_800mb','VGRD_750mb', 'VGRD_700mb','VGRD_650mb','VGRD_600mb', 'VGRD_550mb','VGRD_500mb',
+                    'PRES_surface', 'PRES_80maboveground','HGT_950mb','HGT_900mb','HGT_850mb','HGT_800mb','HGT_750mb','HGT_700mb','HGT_650mb','HGT_600mb','HGT_550mb','HGT_500mb' ]
+                   ,select=[[0],[-22.86],[360-46.28,360-46.29]])
 #    
 
-    df = Serie.get(varnames,select=[[0],[-22.86],[360-46.28,360-46.29]])
+#     df = Serie.get(varnames,select=[[0],[-22.86],[360-46.28,360-46.29]])
 
 
-    df.to_csv('/home/thomas/gfs_data_levels.csv')
+    df.to_csv('/home/thomas/phd/statmod/data/gfs_data/fnl_20140214.csv')
 
 #===============================================================================
 # To be plot in hovermoller

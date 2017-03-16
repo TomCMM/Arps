@@ -6,18 +6,9 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from LCBnet_lib import *
+from cloLCBnet_lib import *
 
-def Tk(P, PT):
-    """
-    Calculate the Real Temperature in Kelvin
-    """
-    print("Calculate the Real temperature in Kelvin")
-    P0 = 100000
-    Rd = 287.06
-    Cp = 1004.5
-    Tk = PT*(P/P0)**(Rd/Cp)
-    return Tk
+
 
 def geo_idx(dd, dd_array):
     """
@@ -106,19 +97,4 @@ if __name__ == "__main__":
     plt.show()
     
     
-    
-    
-    
-#    
-# 
-#      
-#      
-#      
-#      
-#     plt.plot(arps_corr_pc2[lon_idx, lat_idx])
-#     arps_corr_pc2 = np.reshape(arps_corr_pc2.values, (1201,1201))
-#     plt.scatter(arps_corr_pc2[lon_idx, lat_idx], stamod.eigenvectors.iloc[1,:])
-#     plt.show()
-#   
-
 
