@@ -6,20 +6,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from cloLCBnet_lib import *
-
-
-
-def geo_idx(dd, dd_array):
-    """
-      search for nearest decimal degree in an array of decimal degrees and return the index.
-      np.argmin returns the indices of minium value along an axis.
-      so subtract dd from all values in dd_array, take absolute value and find index of minium.
-     """
-
-    geo_idx = (np.abs(dd_array - dd)).argmin()
-    return geo_idx
-
+from LCBnet_lib import *
+from toolbox.geo import geo_idx
 
 if __name__ == "__main__":
     AttSta = att_sta()

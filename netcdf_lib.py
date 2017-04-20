@@ -24,7 +24,7 @@ import os.path # to check if the file exist
 from scipy.io import netcdf
 import numpy as np
 import matplotlib
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import scipy.ndimage
 # from pylab import *
 import matplotlib.gridspec as gridspec
@@ -39,6 +39,8 @@ import sys
 import io
 from netCDF4 import Dataset
 import copy
+from scipy.spatial import cKDTree
+from toolbox.geo import cart2pol
 
 class SpecVar():
     Cst={"P0":100000,
@@ -73,6 +75,10 @@ class SpecVar():
             'z':self.__z,
             'x':self.__x,
             'y':self.__y,
+            'QVSFLX_wm2':self.__QVSFLX_wm2,
+            'PTSFLX_wm2':self.__PTSFLX_wm2,
+            'sm_ms':self.__sm_ms,
+            
         }
         self.attributes = { }
         self.varname = {
@@ -92,7 +98,10 @@ class SpecVar():
             'Lat':'Vector position latitude',
             'Longrid':'matrix Longitude',
             'Latgrid':'matrix latitude',
-            'Tc': 'Temperature in degree Celsius'
+            'Tc': 'Temperature in degree Celsius',
+            "QVSFLX_wm2": 'Latent heat flux',
+            "PTSFLX_wm2": "Sensible heat flux in wm-2",
+            "sm_ms" : 'wind speed in m/s'
         }
     def __z(self,arps):
         """
@@ -111,12 +120,11 @@ class SpecVar():
         return longitude
         """
         return arps.get('Lon')
-        
     def __QT(self, arps):
         """
         Calculate Total hydrometeors
         """
-        print("Calculate Total hydrometeors")
+        #print("Calculate Total hydrometeors")
 
         QI = arps.get('QI')
         QH = arps.get('QH')
@@ -133,7 +141,7 @@ class SpecVar():
         """
         Calculate Potential temperature in degree
         """
-        print("Calculate Potential temperature in degree")
+        #print("Calculate Potential temperature in degree")
 
         PT=arps.get('PT')
         data=PT[:]-273.15
@@ -141,12 +149,12 @@ class SpecVar():
         results.long_name=self.varname['PTc']
         results.units='C'
         return results
-
+    
     def __Phpa(self, arps):
         """
         Calculate the Pressure in hectopascale
         """
-        print('Calculate the Pressure in Hectopascale')
+        #print('Calculate the Pressure in Hectopascale')
         P=arps.get('P')
         data=P[:]*10**-2
         results=scipy.io.netcdf.netcdf_variable(data,P.typecode(),P._size,P.shape,P.dimensions)
@@ -157,7 +165,7 @@ class SpecVar():
         """
         Calculate the Pressure in hectopascale
         """
-        print('Calculate the pressure in hectopascale')
+        #print('Calculate the pressure in hectopascale')
         PBAR=arps.get('PBAR')
         data=PBAR[:]*10**-2
         results=scipy.io.netcdf.netcdf_variable(data,PBAR.typecode(),PBAR._size,PBAR.shape,PBAR.dimensions)
@@ -169,7 +177,7 @@ class SpecVar():
         """
         Calculate the totale Pressure in hectopascale
         """
-        print('calculate the totale pressur in hectopascale') 
+        #print('calculate the totale pressur in hectopascale') 
         Phpa=arps.get('Phpa')
         Pbarhpa=arps.get('Pbarhpa')
         data=Phpa[:]+Pbarhpa[:]
@@ -181,7 +189,7 @@ class SpecVar():
         """
         Calculate the virtual potential temperature
         """
-        print("Calculate the virtual potential temperature")
+        #print("Calculate the virtual potential temperature")
         Eps=self.Cst['Rd']/self.Cst['Rv']
 
         QT=arps.get('QT')
@@ -198,7 +206,7 @@ class SpecVar():
         """
         Calculate the Real Temperature in Kelvin
         """
-        print("Calculate the Real temperature in Kelvin")
+        #print("Calculate the Real temperature in Kelvin")
         P=arps.get('P')
         PT=arps.get('PT')
         data=PT[:]*(P[:]/self.Cst['P0'])**(self.Cst['Rd']/self.Cst['Cp'])
@@ -218,7 +226,7 @@ class SpecVar():
         """
         Calculate the vapor Pressure
         """
-        print('Calculate the partial vapor Pressure')
+        #print('Calculate the partial vapor Pressure')
         QV= arps.get('QV')
         P=arps.get('P')
         data=((QV[:]*(P[:]))/(0.622+QV[:]))
@@ -231,7 +239,7 @@ class SpecVar():
         """
         Calculate the partial dry air pressure
         """
-        print('Calculate the partial dry air Pressure')
+        #print('Calculate the partial dry air Pressure')
         Pv=arps.get('Pv')
         P=arps.get('P')
         data=P[:]-Pv[:]
@@ -245,7 +253,7 @@ class SpecVar():
         Calculate vapor pressure at saturation
         CIMO GUIDE , WMO, 2006
         """
-        print('Calculate the vapor pressure at saturation')
+        #print('Calculate the vapor pressure at saturation')
         Tk=arps.get('Tk')
         data=6.112*np.exp(17.62*(Tk[:]-273.15)/(243.12+(Tk[:]-273.15)))*10**2
         results=scipy.io.netcdf.netcdf_variable(data,Tk.typecode(),Tk._size,Tk.shape,Tk.dimensions)
@@ -256,7 +264,7 @@ class SpecVar():
         """
         Calculate the relative humidity
         """
-        print('Calculate the relative humidity')
+        #print('Calculate the relative humidity')
         Pv=arps.get('Pv')
         Psat=arps.get('Psat')
         data=(Pv[:]/Psat[:])*100
@@ -269,7 +277,7 @@ class SpecVar():
         """
         Calculate the Equivalent Potential Temperature
         """
-        print('Calculate the Equivalent Potential Temperature')
+        #print('Calculate the Equivalent Potential Temperature')
         QT=arps.get('QT')
         Tk=arps.get('Tk')
         Pd=arps.get('PD')
@@ -379,7 +387,6 @@ class SpecVar():
         Lat=arps.get('Lat')
         Lon=arps.get('Lon')
         
-        print Lon
         
         Z=arps.get('z_stag')
         resLat,resLon=np.meshgrid(Lat[:],Lon[:])
@@ -390,19 +397,47 @@ class SpecVar():
 #         Longrid=scipy.io.netcdf.netcdf_variable(resLon,Lon.typecode(),size,(Z.shape,Lat.shape,Lon.shape),(Z.dimensions,Lat.dimensions,Lon.dimensions))
         return resLon
         pass
+   
+    def __QVSFLX_wm2(self,arps):
+        """
+        Latent heat flux
+        """
+        QVSFLX = arps.get('QVSFLX')[:]
+        return QVSFLX*self.Cst['Lv']
+   
+    def __PTSFLX_wm2(self,arps):
+        """
+         Upward heat flux at surface [W m-2]
+         
+         This is computed as -ptsflx*Cp where pthsflx is the ARPS surface sensible heat flux 
+         [K.kg.m-2.s-1], defined positive downward, and Cp is the specific heat at constant pressure [J.K-1.kg-1]
 
+        Note there is an error in the comment lines of the ARPS source code that has not been corrected :
+        ptsflx units are K.Kgm-2s-1, not K.kg.m-1s-2
+        """
+        return arps.get('PTSFLX')[:]*self.Cst['Cp']
     
+    def __sm_ms(self,arps):
+        """
+        Return Wind speed in m.s-1
+        """
+        
+        u = arps.get('U')[:,:,:,:-1] # I SHOULD TAKE CARE OF THIS
+        v = arps.get('V')[:,:,:-1,:]# I SHOULD TAKE CARE OF THIS
+        rho, theta = cart2pol(u, v)
+        return rho
+
 class FileProperties():
-        def __init__(self,InPath,model):
+        def __init__(self,InPath,model, initime):
             self.attributes={
             "model":model,
             "InPath":InPath,
             "dirname":os.path.dirname(InPath),
             "basename":os.path.basename(InPath)
             }
-            self.__time(InPath,model)
+            self.__time(InPath,model, initime)
 
-        def __time(self,InPath,model):
+        def __time(self,InPath,model, initime):
             UTC=3 #Hour
 #             print "*"*100
 #             print "*"*100
@@ -410,16 +445,15 @@ class FileProperties():
 #             try:
             if model == "ARPS":
                 filetime=int(os.path.basename(InPath)[-6:])
-#                     print self.__dict__
-#                 initime=self.__dict__["INITIAL_TIME"] # need to be implemented
-                initime ='2015-11-10_12:00:00' # UTC time
-#                 print "WARNING WITH INITIME"
                 UTC=UTC*3600
                 Init = datetime.datetime.strptime(initime, "%Y-%m-%d_%H:%M:%S")
                 Fortime=datetime.timedelta(seconds=filetime)
                 UTCtime=datetime.timedelta(seconds=UTC)
+#                 print Init
+#                 print Fortime
                 Time=str(Init+Fortime-UTCtime)
-                self.attributes['time']=Time
+                print Time
+                self.attributes['time']=pd.to_datetime(Time)
                 
             if model == 'GFS':
                 """
@@ -443,7 +477,7 @@ class FileProperties():
                 print filetime
                 Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H%M")
                 Time=Time-datetime.timedelta(hours=UTC)
-                self.attributes['time']=Time
+                self.attributes['time']=pd.to_datetime(Time)
 
             if model == "fnl":
                 """
@@ -455,7 +489,7 @@ class FileProperties():
                 print filetime
                 Time = datetime.datetime.strptime(filetime, "%Y%m%d_%H")
                 Time=Time-datetime.timedelta(hours=UTC)
-                self.attributes['time']=Time
+                self.attributes['time']=pd.to_datetime(Time)
                 
             if model == 'GFS_for':
                 """
@@ -468,18 +502,14 @@ class FileProperties():
                 Time=Time-datetime.timedelta(hours=UTC)
                 fortime=datetime.datetime.strptime(os.path.basename(InPath)[21:23], "%H")
 
-                self.attributes['time']=Time
+                self.attributes['time']=pd.to_datetime(Time)
                 self.attributes['forecast']=fortime
 #             except ValueError:
 #                 time = input("Enter UTC time in format->  %Y%m%d_%H_%M: ")
 #                 print "your tiped:"+ time
 #                 Time = datetime.datetime.strptime(time, "%Y%m%d_%H_%M")
 #                 Time=Time-datetime.timedelta(hours=UTC)
-#                 self.attributes['time']=Time
-                    
-                    
-    
-                    
+#                 self.attributes['time']=Time   
 #             if model == 'GFS2':
 #                 """
 #                 GFS_Global_0p5deg_20140101_0000_anl.grib2.nc
@@ -498,10 +528,8 @@ class FileProperties():
 #                 Time=Time-datetime.timedelta(hours=UTC)
 #                 self.attributes['time']=Time
 
-
         def getcharac(self):
             return self.attributes
-
 
 class BaseVars():
     """
@@ -543,16 +571,16 @@ class BaseVars():
         self.module = { }
         self.varname = { }
         self.attributes = { }
-        self.__properties(InPath, model)
         self.__load(f)
         for att in f.ncattrs():
-            self.__setatt('attributes', att, self.__dict__[att])
+            self.__setatt('attributes', att, self.__dict__[att])             
          
         self.__applymap(model)
         self.f = f
+        self.__properties(InPath, model,self.__dict__['INITIAL_TIME'])
 
-    def __properties(self,InPath,model):
-        properties = FileProperties(InPath,model)
+    def __properties(self,InPath,model, initime):
+        properties = FileProperties(InPath,model, initime)
         charac=properties.getcharac()
         for i in charac:
             self.__setatt('attributes',i,charac[i])
@@ -682,8 +710,6 @@ class BaseVars():
         else:
             return self.data[variable]
 
- 
-
 class arps():
     def __init__(self):
         self.__knowvariables = { }
@@ -757,14 +783,15 @@ class arps():
             Iselect =None
             
         
-        olddim = data.dimensions
+#         print data.shape
+        olddim = data.shape
         newdim = []
         
         lendim = len(olddim)
         
         if userdim != lendim: # check if the user gave the right number of parameters
-            print lendim
-            print userdim
+#             print lendim
+#             print userdim
             raise Exception ("Subset parameters %s do not agree with the data dimensions : %s !" % (userdim, lendim))
 
         # Double the parameter in case of same limit
@@ -826,9 +853,39 @@ class arps():
         if lendim ==4:
             Newdata =data[Iselect[0][0]:Iselect[0][1],Iselect[1][0]:Iselect[1][1],Iselect[2][0]:Iselect[2][1],Iselect[3][0]:Iselect[3][1]]
 
-
+        if lendim ==5:
+            Newdata =data[Iselect[0][0]:Iselect[0][1],Iselect[1][0]:Iselect[1][1],Iselect[2][0]:Iselect[2][1],Iselect[3][0]:Iselect[3][1],Iselect[4][0]:Iselect[4][1]]
         return Newdata
 
+    def get_multiple_points(self,data, **kwargs):
+        """
+        Return 
+            multiple point variable
+        """
+        select_points = np.array(kwargs['kwargs']['select_points'])
+        lendim = len(data.shape)
+        print lendim
+        Newdata =np.array([])
+        
+
+        if lendim == 1:
+            for l in zip( select_points[3]):
+                Newdata  = np.append( Newdata, data[l])
+
+        if lendim == 2:
+            for k,l in zip(select_points[2], select_points[3]):
+                Newdata  = np.append( Newdata, data[k,l])
+        if lendim == 3:
+            for j,k,l in zip(select_points[1], select_points[2], select_points[3]):
+                Newdata  = np.append( Newdata, data[j,k,l])
+        if lendim ==4:
+            for i,j,k,l in zip(select_points[0], select_points[1], select_points[2], select_points[3]):
+                Newdata  = np.append( Newdata, data[i,j,k,l])
+        if lendim ==5:
+            for i,j,k,l,m in zip(select_points[0], select_points[1], select_points[2], select_points[3], select_points[4]):
+                Newdata  = np.append( Newdata, data[i,j,k,l,m])
+        return Newdata
+     
     def get(self,variable,**kwargs):
         """
         1) Try if the variabile is already in the cache
@@ -852,6 +909,10 @@ class arps():
                 print >>sys.stderr, "%s is not know,\n%s" % (variable, str(e))
                 print >>sys.stderr, "Then it return np.Nan"
                 return np.array([np.nan])
+            except AttributeError:
+                print >>sys.stderr, "%s is not know,\n%s" % (variable, str(e))
+                print >>sys.stderr, "Then it return np.Nan"
+                return np.array([np.nan])
 
         
         if 'select'in kwargs.keys():
@@ -862,7 +923,8 @@ class arps():
 #             return self.__filter(self.__cachedata[variable], kwargs=kwargs)
 #             print self.showvar()
             return self.__filter(self.__cachedata[variable], kwargs=kwargs)
-    
+        elif 'select_points'in kwargs.keys():
+            return self.get_multiple_points(self.__cachedata[variable] , kwargs=kwargs)
         else:
             return self.__cachedata[variable]
         
@@ -872,6 +934,7 @@ class arps():
             del self.__cachedata[variable]
         except KeyError,e:
             print('The variable is not known')
+                  
     def showvar(self):
 
         size=max(max(map(len,self.__varname.keys())), len("Variable"))
@@ -880,6 +943,12 @@ class arps():
         print "-" * size,"  ","-"*len("Description")
         for i in np.sort(self.__varname.keys()):
             print( fmt % (i, str(self.__varname[i])) )
+            
+    def getvarname(self):
+        """
+        Return a list with the name fo the variable
+        """
+        return self.__varname.keys()
     def showatt(self):
         for i in self.__attributes:
             print(i+':'+' '*5+str(self.__attributes[i]))
@@ -897,8 +966,68 @@ class arps():
 
     def close(self):
         self.f.close()
-        
 
+    def is_point_in_domain(self, points_lat, points_lon):
+        """
+        PARAMETERS:
+            Latitude
+            Longitude
+        RETURN
+            a list of true or fal
+        """
+        model_lat = self.get('Lat')
+        model_lon = self.get('Lon')
+        
+        
+        latmodelmin = model_lat.min()
+        latmodelmax = model_lat.max()
+        lonmodelmin = model_lon.min()
+        lonmodelmax = model_lon.max()
+
+        points_lat = pd.Series(points_lat, name='Lat')
+        points_lon = pd.Series(points_lon, name='Lon')
+
+        points_lat = points_lat[(points_lat > latmodelmin) & (points_lat < latmodelmax) ]
+        points_lon = points_lon[(points_lon > lonmodelmin) & (points_lon < lonmodelmax) ]
+        point_lat_lons = pd.concat([points_lat, points_lon], axis=1, join='inner')
+
+        
+        point_lat_lons.dropna(inplace=True)
+ 
+        return point_lat_lons['Lat'], point_lat_lons['Lon']
+
+    def get_gridpoint_position(self, points_lat, points_lon):
+        """
+        Parameters:
+            lat: A serie with the latitude of the point to select
+            lon: A serie with the longitude of the point to select
+        Return:
+            A dataframe with the i,j position in the grid
+        """
+        
+        model_lat = self.get('Lat')
+        model_lon = self.get('Lon')
+        print model_lat
+        points_lat, points_lon =  self.is_point_in_domain(points_lat, points_lon)
+
+        Is = []
+        Js = []
+
+        for point_lat, point_lon in zip(points_lat.values, points_lon.values):
+            distance_i = (model_lat - point_lat)**2 
+            distance_j = (model_lon - point_lon)**2
+            I = np.where(distance_i == distance_i.min())
+            J = np.where(distance_j == distance_j.min())
+            Is.append(I[0][0])
+            Js.append(J[0][0])
+
+        idxs = pd.DataFrame([Is, Js])
+        idxs = idxs.T
+        
+        idxs.index = points_lat.index
+        idxs.columns = ['i','j']
+        return idxs
+        
 class netcdf_serie():
     def __init__(self,files,model):
         self.dataframe=pd.DataFrame([])
@@ -906,7 +1035,8 @@ class netcdf_serie():
 
     def __modelserie(self,files,model):
         for InPath in files:
-            properties = FileProperties(InPath,model)
+            initime = BaseVars(InPath,model).__dict__['INITIAL_TIME']
+            properties = FileProperties(InPath,model, initime)
             charac = properties.getcharac()
             if len(self.dataframe) == 0: 
                 self.dataframe = pd.DataFrame([charac.values()],columns=charac.keys(),index=[charac['time']])
@@ -962,7 +1092,9 @@ class netcdf_serie():
         return dataframe
 
     def getdfmap(self,var,**kwargs):
-
+        """
+        Return a dataframe of the selectioned variable
+        """
 
         dataframe= self.dataframe
         if not isinstance(var, list):
@@ -971,7 +1103,6 @@ class netcdf_serie():
 
         data_file = pd.DataFrame()
         for index,row in dataframe.iterrows(): # COULD USE AN APPLY FUNCTION
-            print(index)
             ARPS=None
             BASE=None
             
@@ -994,392 +1125,349 @@ class netcdf_serie():
                 except IOError:
                     vars_file[v] = np.array([np.nan])
 
-            temp = pd.DataFrame(vars_file)
-            data_file = pd.concat([data_file, temp],axis=1)
+            temp = pd.DataFrame(vars_file).T # MODIFICATION TO TAKE MULTIPLE POINT BUT JUST ONE VARIABLE
+            data_file = pd.concat([data_file, temp],axis=0)
 
-        data_file = data_file.T
         data_file.index = dataframe.index
         return data_file
 
-
-class ArpsFigures():
-    def __init__(self,arps):
-        self.arps=arps# Es ce que ca duplique les donnés de arps ?????????????  
-        self.para= { }
-        self.paradef= {
-            'OutPath':'/home/thomas/',
-            'screen_width':1920,
-            'screen_height':1080,
-            'DPI':96,
-            'Latmin':self.arps.get('Lat')[:].min(),
-            'Latmax':self.arps.get('Lat')[:].max(),
-            'Lonmin':self.arps.get('Lon')[:].min(),
-            'Lonmax':self.arps.get('Lon')[:].max(),
-            'Altmin':self.arps.get('z_stag')[:][0],
-            'Altmax':self.arps.get('z_stag')[:][-1]
-            }
-        self.__figwidth()
-        self.__subtitle(arps)
-    def __figwidth(self):
-        width=self.getpara('screen_width')
-        height=self.getpara('screen_height')
-        DPI=self.getpara('DPI')
-        wfig=width/DPI #size in inches 
-        hfig=height/DPI
-        self.setpara('wfig',wfig)
-        self.setpara('hfig',hfig)
-    def __subtitle(self,arps):
-        """
-        Write the subtitle of the plot
-        """
-        sub=self.arps.getatt('time')
-        self.setpara('subtitle', sub)
-
-    def setpara(self,parameter,value):
-        self.para[parameter]=value
-        print(str(parameter)+' has been set to -> '+ str(value))
-    def getpara(self,parameter):
-        try:
-            return self.para[parameter]
-        except KeyError:
-            print(parameter + ' has been not set -> Default value used ['+str(self.paradef[parameter])+']')
-            try:
-                return self.paradef[parameter]
-            except KeyError:
-                print(parameter+ ' dont exist')
-    def delpara(self,varname):
-        try:
-            del self.para[varname]
-            print('Deleted parameter-> ',varname)
-        except KeyError:
-            print('This parameter dont exist')
-    def __setparadef(self,parameter,value):
-        self.paradef[parameter]=value
-        print(str(parameter)+' has been set by [default] to -> '+ str(value))
-    def __getparadef(self,parameter):
-        try:
-            return self.paradef[parameter]
-        except KeyError:
-                print(parameter+ ' by [default] dont exist')
-    def __levels(self,varname):
-        self.paradef['nlevel']=10# number of discrete variabel level
-        self.paradef['varmax']=self.arps.get(varname)[:].max()
-        self.paradef['varmin']=self.arps.get(varname)[:].min()
-        varmax=self.getpara('varmax')
-        varmin=self.getpara('varmin')
-        nlevel=self.getpara('nlevel')
-        
-#         if varmin == 0 and varmax ==0:
-#             varmax=1
-#         print varmax
-#         print varmin
-        levels=np.linspace(varmin,varmax,nlevel)
-        return levels
-    def getvar(self,varname):
-        """
-        This module select data on the needed domain
-        """
-        #=======================================================================
-        # get data and parameters
-        #=======================================================================
-        self.__getIpos() # find the indice of domain to select
-        ILatmin=self.getpara('ILatmin')
-        ILatmax=self.getpara('ILatmax')
-        ILonmin=self.getpara('ILonmin')
-        ILonmax=self.getpara('ILonmax')
-        IAltmin=self.getpara('IAltmin')
-        IAltmax=self.getpara('IAltmax')
-        data=self.arps.get(varname)[:]
-        selected='4d variable selected'
-        
-        if ILatmin == ILatmax:
-            ILatmax=ILatmin+1
-        if ILonmin == ILonmax:
-            ILonmax=ILonmin+1
-        if IAltmin == IAltmax:
-            IAltmax=IAltmin+1
-        try:
-            Ndata=data[0,IAltmin:IAltmax, ILatmin:ILatmax, ILonmin:ILonmax]
-            Ndata=np.squeeze(Ndata)
-            self.__setparadef('varmax',Ndata.max())
-            self.__setparadef('varmin',Ndata.min())
-            return Ndata
-        except:
-            selected="3d variable selected"
-            try:
-                Ndata=data[IAltmin:IAltmax, ILatmin:ILatmax,ILonmin:ILonmax]
-                Ndata=np.squeeze(Ndata)
-                self.__setparadef('varmax',Ndata.max())
-                self.__setparadef('varmin',Ndata.min())
-                return Ndata
-            except:
-                selected='2d variable selected'
-                try:
-                    Ndata=data[0,ILatmin:ILatmax,ILonmin:ILonmax]
-                    Ndata=np.squeeze(Ndata)
-                    self.__setparadef('varmax',Ndata.max())
-                    self.__setparadef('varmin',Ndata.min())
-                    return Ndata
-                except:
-                    selected='1d variables selected'
-                    try:
-                        if varname == 'Lat':
-                            Ndata=data[ILatmin:ILatmax]
-                            self.__setparadef('varmax',Ndata.max())
-                            self.__setparadef('varmin',Ndata.min())
-                            return Ndata
-                            print('Lat variable selected')
-                        if varname == 'Lon':
-                            Ndata=data[ILonmin:ILonmax]
-                            self.__setparadef('varmax',Ndata.max())
-                            self.__setparadef('varmin',Ndata.min())
-                            return Ndata
-                            print('Lon variable selected')
-                    except:
-                        print('Ask your mom she know how to fix the problem!')
-            print(selected+" -> "+ varname)
-    def __getIpos(self):
-        """
-        Select and return the position Lat/Lon of the specfied domain
-        """
-        #=======================================================================
-        # Get data and parameters
-        #=======================================================================
-        Lonmin=self.getpara('Lonmin')
-        Lonmax=self.getpara('Lonmax')
-        Latmin=self.getpara('Latmin')
-        Latmax=self.getpara('Latmax')
-        Altmin=self.getpara('Altmin')
-        Altmax=self.getpara('Altmax')
-        Lat=self.arps.get('Lat')[:]
-        Lon=self.arps.get('Lon')[:]
-        Alt=self.arps.get('z_stag')[:][:]
-        #=======================================================================
-        # Find indices to select the needed domain
-        #=======================================================================
-        try:
-            Altcross=self.getpara('Altcross')
-            ILatmin=self.__findI(Lat, Latmin)
-            ILatmax=self.__findI(Lat, Latmax)
-            ILonmin=self.__findI(Lon, Lonmin)
-            ILonmax=self.__findI(Lon, Lonmax)
-            IAltmin=self.__findI(Alt, Altcross)
-            IAltmax=self.__findI(Alt, Altcross)
-            print('==================================')
-            print('Horizontal cross section selected')
-            print('==================================')
-        except KeyError:
-            print('To make an horizontal cross section set Altcross')
-        try:
-            Loncross=self.getpara('Loncross')
-            ILatmin=self.__findI(Lat, Latmin)
-            ILatmax=self.__findI(Lat, Latmax)
-            ILonmin=self.__findI(Lon, Loncross)
-            ILonmax=self.__findI(Lon, Loncross)
-            IAltmin=self.__findI(Alt, Altmin)
-            IAltmax=self.__findI(Alt, Altmax)
-            print('==================================')
-            print('North South vertical cross section selected')
-            print('==================================')
-        except KeyError:
-            print('To make an North South cross section set Loncross')
-        try:
-            Latcross=self.getpara('Latcross')
-            ILatmin=self.__findI(Lat, Latcross)
-            ILatmax=self.__findI(Lat, Latcross)
-            ILonmin=self.__findI(Lon, Lonmin)
-            ILonmax=self.__findI(Lon, Lonmax)
-            IAltmin=self.__findI(Alt, Altmin)
-            IAltmax=self.__findI(Alt, Altmax)
-            print('==================================')
-            print('East West vertical cross section selected')
-            print('==================================')
-        except KeyError:
-            print('To make an East West cross section set Latcross')
-        #=======================================================================
-        # set Indice in the dictionnary "para"
-        #=======================================================================
-        try:
-            self.setpara('ILatmin',ILatmin)
-            self.setpara('ILatmax',ILatmax)
-            self.setpara('ILonmin',ILonmin)
-            self.setpara('ILonmax',ILonmax)
-            self.setpara('IAltmin',IAltmin)
-            self.setpara('IAltmax',IAltmax)
-        except UnboundLocalError:
-            print('Please set Altcross, or Loncross or Latcross ')
-    def __findI(self,var,varlim):
-        indice=min(range(len(var)), key=lambda i: abs(var[i]-varlim))
-        return indice
-    def __contour(self,varname):
-        var=self.getvar(varname)[:]
-        lon=self.getvar('Longrid')[:]
-        lat=self.getvar('Latgrid')[:]
-        alt=self.getvar('ZP')[:]
-        try:
-            self.para['Altcross']
-            X=lon
-            Y=lat
-            select="Horizontal cross section is being plotted"
-        except KeyError:
-            try:
-                self.para['Latcross']
-                X=lon
-                Y=alt
-                select="Vertical East West cross section is being plotted"
-            except KeyError:
-                try:
-                    self.para['Loncross']
-                    X=lat
-                    Y=alt
-                    select="Vertical North South cross section is being plotted"
-                except:
-                    print('Their is a problem on the ploting module - ask your mom')
-#         print(select)
-#         print(X.shape)
-#         print(Y.shape)
-#         print(var.shape)
-        levels=self.__levels(varname)
-        return [X,Y,var,levels]
-    def contourf(self,varname):
-        [X,Y,var,levels]=self.__contour(varname)
-        try:
-            plot=plt.contourf(X,Y,var,cmap='coolwarm',levels=levels)
-        except:
-            plot=plt.contourf(X,Y,var,cmap='coolwarm')
-#             pass
-#         plot=plt.contourf(X,Y,var,cmap='inferno',levels=levels)
-        return plot
-    def contour(self,varname):
-        [X,Y,var,levels]=self.__contour(varname)
-#         plot=plt.contourf(X,Y,var,cmap='inferno',levels=levels)
-#         plot=plt.contour(X,Y,var,levels=levels,cmap='Greys')
-        plot=plt.contour(X,Y,var,levels=levels, colors='k')
-        return plot
-    def windvector(self):
-        """
-        x: vector position horizontal length (n)
-        y: vector position vertical length (m)
-        U: matrix zonal wind shape (m*n)
-        V: matrix meridional wind shape (m*n)
-        """
-        self.__setparadef('Nbarb',10)
-        self.__setparadef('Lbarb',5)
-        Nbarb=self.getpara('Nbarb')
-        Lbarb=self.getpara('Lbarb')
-        U=self.getvar('U')
-        V=self.getvar('V')
-        W=self.getvar('W')
-        lon=self.getvar('Longrid')
-        lat=self.getvar('Latgrid')
-        alt=self.getvar('ZP')
-        try:
-            self.para['Altcross']
-            X=lon
-            Y=lat
-            select="Horizontal cross section is being plotted"
-        except KeyError:
-            try:
-                self.para['Latcross']
-                X=lon
-                Y=alt
-                V=W
-                select="Vertical East West cross section is being plotted"
-            except KeyError:
-                try:
-                    self.para['Loncross']
-                    X=lat
-                    Y=alt
-                    U=V
-                    V=W
-                    select="Vertical North South cross section is being plotted"
-                except:
-                    print('Their is a problem on the ploting module - ask your mom')
-        print("U shape"+str(U.shape))
-        print("V shape"+str(V.shape))
-        print("Y shape"+str(Y.shape))
-        print("X shape"+str(X.shape))
-        if X.shape != U.shape and Y.shape != V.shape:
-            print('x * y does not equal to U or V')
-        Up=U[::Nbarb,::Nbarb]
-        Vp=V[::Nbarb,::Nbarb]
-        Xp=X[::Nbarb,::Nbarb]
-        Yp=Y[::Nbarb,::Nbarb]
-#         plot=plt.barbs(Xp,Yp,Up,Vp,length=Lbarb, barbcolor=['k'],pivot='middle',sizes=dict(emptybarb=0))
-        plot=plt.quiver(Xp,Yp,Up,Vp)
-        return plot
-
-    #     ###################################
-    #     # Position of the Stations
-    #     ###################################
-    #     StaPosFile="/home/thomas/PhD/obs-lcb/staClim/LatLonSta.csv"
-    #     StaPos={}
-    #     with open (StaPosFile) as StaPosF:
-    #         reader_IAC=csv.reader(StaPosF,delimiter=",")
-    #         header_IAC=reader_IAC.next()
-    #         for h in header_IAC:
-    #             StaPos[h]=[]
-    #         for row in reader_IAC:
-    #             for h,v in zip(header_IAC,row):
-    #                 StaPos[h].append(v)
-    # 
-    #     Lat=np.array(Lat)
-    #     Lon=np.array(Lon)
-    #     LatStaI=[]
-    #     LonStaI=[]
-    #     LatSta=[]
-    #     LonSta=[]
-    #     StaName=[]
-    #     for ista,sta in enumerate(StaPos['Posto']):
-    #         print('open station=> '+sta)
-    #         LatI=np.searchsorted(Lat,float(StaPos['Lat '][ista]), side="left")
-    #         LonI=np.searchsorted(Lon,float(StaPos['Lon'][ista]), side="left")
-    #         if LatI!=0 and LonI!=0:
-    #             LatSta=LatSta+[float(StaPos['Lat '][ista])]# Use in compareGFS_OBS.py
-    #             LonSta=LonSta+[float(StaPos['Lon'][ista])]#Use in compareGFS_OBS.py
-    #             LatStaI=LatStaI+[LatI]
-    #             LonStaI=LonStaI+[LonI]
-    #             StaName=StaName+[StaPos['Posto'][ista]]
-    #             print("In map => "+ StaPos['Posto'][ista] +" at "+ str(LatI) +" and " +str(LonI))
-    pass
-
-
-class ArpsFigures2():
-    def __init__(self, arps):
-        self.arps = arps
-
-    @staticmethod
-    def getpara(p, var):
-        return p[var]
-
-    @staticmethod
-    def getparamset():
-        paradef = {
-            'OutPath':'/home/thomas/',
-            'screen_width':1920,
-            'screen_height':1080,
-            'DPI':96,
-            'Latmin': -90,
-            'Latmax': 90,
-            'Lonmin': -180,
-            'Lonmax': 180,
-            'Altmin': 0,
-            'Altmax': 8000
-        }
-        return paradef
-
-    def fitcoordinate(self, p, var):
-        p['Latmin'] = self.arps.get(var)[:].min()
-        p['Latmax'] = self.arps.get(var)[:].max()
-        p['Lonmin'] = self.arps.get('Lon')[:].min()
-        p['Lonmax'] = self.arps.get('Lon')[:].max()
-        return p
-
-    def contourf(self, param, variables, prefix = None):
-        for var in variables:
-            filename = "%s%s.png" % (prefix + "_" if prefix else "", var)
-            filename = os.path.join(ArpsFigures2.getpara(param, 'output'), filename)
-            print filename
-
-        pass
-
+# class ArpsFigures():
+#     def __init__(self,arps):
+#         self.arps=arps# Es ce que ca duplique les donnés de arps ?????????????  
+#         self.para= { }
+#         self.paradef= {
+#             'OutPath':'/home/thomas/',
+#             'screen_width':1920,
+#             'screen_height':1080,
+#             'DPI':96,
+#             'Latmin':self.arps.get('Lat')[:].min(),
+#             'Latmax':self.arps.get('Lat')[:].max(),
+#             'Lonmin':self.arps.get('Lon')[:].min(),
+#             'Lonmax':self.arps.get('Lon')[:].max(),
+#             'Altmin':self.arps.get('z_stag')[:][0],
+#             'Altmax':self.arps.get('z_stag')[:][-1]
+#             }
+#         self.__figwidth()
+#         self.__subtitle(arps)
+#     def __figwidth(self):
+#         width=self.getpara('screen_width')
+#         height=self.getpara('screen_height')
+#         DPI=self.getpara('DPI')
+#         wfig=width/DPI #size in inches 
+#         hfig=height/DPI
+#         self.setpara('wfig',wfig)
+#         self.setpara('hfig',hfig)
+#     def __subtitle(self,arps):
+#         """
+#         Write the subtitle of the plot
+#         """
+#         sub=self.arps.getatt('time')
+#         self.setpara('subtitle', sub)
+# 
+#     def setpara(self,parameter,value):
+#         self.para[parameter]=value
+#         print(str(parameter)+' has been set to -> '+ str(value))
+#     def getpara(self,parameter):
+#         try:
+#             return self.para[parameter]
+#         except KeyError:
+#             print(parameter + ' has been not set -> Default value used ['+str(self.paradef[parameter])+']')
+#             try:
+#                 return self.paradef[parameter]
+#             except KeyError:
+#                 print(parameter+ ' dont exist')
+#     def delpara(self,varname):
+#         try:
+#             del self.para[varname]
+#             print('Deleted parameter-> ',varname)
+#         except KeyError:
+#             print('This parameter dont exist')
+#     def __setparadef(self,parameter,value):
+#         self.paradef[parameter]=value
+#         print(str(parameter)+' has been set by [default] to -> '+ str(value))
+#     def __getparadef(self,parameter):
+#         try:
+#             return self.paradef[parameter]
+#         except KeyError:
+#                 print(parameter+ ' by [default] dont exist')
+#     def __levels(self,varname):
+#         self.paradef['nlevel']=10# number of discrete variabel level
+#         self.paradef['varmax']=self.arps.get(varname)[:].max()
+#         self.paradef['varmin']=self.arps.get(varname)[:].min()
+#         varmax=self.getpara('varmax')
+#         varmin=self.getpara('varmin')
+#         nlevel=self.getpara('nlevel')
+#         
+# #         if varmin == 0 and varmax ==0:
+# #             varmax=1
+# #         print varmax
+# #         print varmin
+#         levels=np.linspace(varmin,varmax,nlevel)
+#         return levels
+#     def getvar(self,varname):
+#         """
+#         This module select data on the needed domain
+#         """
+#         #=======================================================================
+#         # get data and parameters
+#         #=======================================================================
+#         self.__getIpos() # find the indice of domain to select
+#         ILatmin=self.getpara('ILatmin')
+#         ILatmax=self.getpara('ILatmax')
+#         ILonmin=self.getpara('ILonmin')
+#         ILonmax=self.getpara('ILonmax')
+#         IAltmin=self.getpara('IAltmin')
+#         IAltmax=self.getpara('IAltmax')
+#         data=self.arps.get(varname)[:]
+#         selected='4d variable selected'
+#         
+#         if ILatmin == ILatmax:
+#             ILatmax=ILatmin+1
+#         if ILonmin == ILonmax:
+#             ILonmax=ILonmin+1
+#         if IAltmin == IAltmax:
+#             IAltmax=IAltmin+1
+#         try:
+#             Ndata=data[0,IAltmin:IAltmax, ILatmin:ILatmax, ILonmin:ILonmax]
+#             Ndata=np.squeeze(Ndata)
+#             self.__setparadef('varmax',Ndata.max())
+#             self.__setparadef('varmin',Ndata.min())
+#             return Ndata
+#         except:
+#             selected="3d variable selected"
+#             try:
+#                 Ndata=data[IAltmin:IAltmax, ILatmin:ILatmax,ILonmin:ILonmax]
+#                 Ndata=np.squeeze(Ndata)
+#                 self.__setparadef('varmax',Ndata.max())
+#                 self.__setparadef('varmin',Ndata.min())
+#                 return Ndata
+#             except:
+#                 selected='2d variable selected'
+#                 try:
+#                     Ndata=data[0,ILatmin:ILatmax,ILonmin:ILonmax]
+#                     Ndata=np.squeeze(Ndata)
+#                     self.__setparadef('varmax',Ndata.max())
+#                     self.__setparadef('varmin',Ndata.min())
+#                     return Ndata
+#                 except:
+#                     selected='1d variables selected'
+#                     try:
+#                         if varname == 'Lat':
+#                             Ndata=data[ILatmin:ILatmax]
+#                             self.__setparadef('varmax',Ndata.max())
+#                             self.__setparadef('varmin',Ndata.min())
+#                             return Ndata
+#                             print('Lat variable selected')
+#                         if varname == 'Lon':
+#                             Ndata=data[ILonmin:ILonmax]
+#                             self.__setparadef('varmax',Ndata.max())
+#                             self.__setparadef('varmin',Ndata.min())
+#                             return Ndata
+#                             print('Lon variable selected')
+#                     except:
+#                         print('Ask your mom she know how to fix the problem!')
+#             print(selected+" -> "+ varname)
+#     def __getIpos(self):
+#         """
+#         Select and return the position Lat/Lon of the specfied domain
+#         """
+#         #=======================================================================
+#         # Get data and parameters
+#         #=======================================================================
+#         Lonmin=self.getpara('Lonmin')
+#         Lonmax=self.getpara('Lonmax')
+#         Latmin=self.getpara('Latmin')
+#         Latmax=self.getpara('Latmax')
+#         Altmin=self.getpara('Altmin')
+#         Altmax=self.getpara('Altmax')
+#         Lat=self.arps.get('Lat')[:]
+#         Lon=self.arps.get('Lon')[:]
+#         Alt=self.arps.get('z_stag')[:][:]
+#         #=======================================================================
+#         # Find indices to select the needed domain
+#         #=======================================================================
+#         try:
+#             Altcross=self.getpara('Altcross')
+#             ILatmin=self.__findI(Lat, Latmin)
+#             ILatmax=self.__findI(Lat, Latmax)
+#             ILonmin=self.__findI(Lon, Lonmin)
+#             ILonmax=self.__findI(Lon, Lonmax)
+#             IAltmin=self.__findI(Alt, Altcross)
+#             IAltmax=self.__findI(Alt, Altcross)
+#             print('==================================')
+#             print('Horizontal cross section selected')
+#             print('==================================')
+#         except KeyError:
+#             print('To make an horizontal cross section set Altcross')
+#         try:
+#             Loncross=self.getpara('Loncross')
+#             ILatmin=self.__findI(Lat, Latmin)
+#             ILatmax=self.__findI(Lat, Latmax)
+#             ILonmin=self.__findI(Lon, Loncross)
+#             ILonmax=self.__findI(Lon, Loncross)
+#             IAltmin=self.__findI(Alt, Altmin)
+#             IAltmax=self.__findI(Alt, Altmax)
+#             print('==================================')
+#             print('North South vertical cross section selected')
+#             print('==================================')
+#         except KeyError:
+#             print('To make an North South cross section set Loncross')
+#         try:
+#             Latcross=self.getpara('Latcross')
+#             ILatmin=self.__findI(Lat, Latcross)
+#             ILatmax=self.__findI(Lat, Latcross)
+#             ILonmin=self.__findI(Lon, Lonmin)
+#             ILonmax=self.__findI(Lon, Lonmax)
+#             IAltmin=self.__findI(Alt, Altmin)
+#             IAltmax=self.__findI(Alt, Altmax)
+#             print('==================================')
+#             print('East West vertical cross section selected')
+#             print('==================================')
+#         except KeyError:
+#             print('To make an East West cross section set Latcross')
+#         #=======================================================================
+#         # set Indice in the dictionnary "para"
+#         #=======================================================================
+#         try:
+#             self.setpara('ILatmin',ILatmin)
+#             self.setpara('ILatmax',ILatmax)
+#             self.setpara('ILonmin',ILonmin)
+#             self.setpara('ILonmax',ILonmax)
+#             self.setpara('IAltmin',IAltmin)
+#             self.setpara('IAltmax',IAltmax)
+#         except UnboundLocalError:
+#             print('Please set Altcross, or Loncross or Latcross ')
+#     def __findI(self,var,varlim):
+#         indice=min(range(len(var)), key=lambda i: abs(var[i]-varlim))
+#         return indice
+#     def __contour(self,varname):
+#         var=self.getvar(varname)[:]
+#         lon=self.getvar('Longrid')[:]
+#         lat=self.getvar('Latgrid')[:]
+#         alt=self.getvar('ZP')[:]
+#         try:
+#             self.para['Altcross']
+#             X=lon
+#             Y=lat
+#             select="Horizontal cross section is being plotted"
+#         except KeyError:
+#             try:
+#                 self.para['Latcross']
+#                 X=lon
+#                 Y=alt
+#                 select="Vertical East West cross section is being plotted"
+#             except KeyError:
+#                 try:
+#                     self.para['Loncross']
+#                     X=lat
+#                     Y=alt
+#                     select="Vertical North South cross section is being plotted"
+#                 except:
+#                     print('Their is a problem on the ploting module - ask your mom')
+# #         print(select)
+# #         print(X.shape)
+# #         print(Y.shape)
+# #         print(var.shape)
+#         levels=self.__levels(varname)
+#         return [X,Y,var,levels]
+#     def contourf(self,varname):
+#         [X,Y,var,levels]=self.__contour(varname)
+#         try:
+#             plot=plt.contourf(X,Y,var,cmap='coolwarm',levels=levels)
+#         except:
+#             plot=plt.contourf(X,Y,var,cmap='coolwarm')
+# #             pass
+# #         plot=plt.contourf(X,Y,var,cmap='inferno',levels=levels)
+#         return plot
+#     def contour(self,varname):
+#         [X,Y,var,levels]=self.__contour(varname)
+# #         plot=plt.contourf(X,Y,var,cmap='inferno',levels=levels)
+# #         plot=plt.contour(X,Y,var,levels=levels,cmap='Greys')
+#         plot=plt.contour(X,Y,var,levels=levels, colors='k')
+#         return plot
+#     def windvector(self):
+#         """
+#         x: vector position horizontal length (n)
+#         y: vector position vertical length (m)
+#         U: matrix zonal wind shape (m*n)
+#         V: matrix meridional wind shape (m*n)
+#         """
+#         self.__setparadef('Nbarb',10)
+#         self.__setparadef('Lbarb',5)
+#         Nbarb=self.getpara('Nbarb')
+#         Lbarb=self.getpara('Lbarb')
+#         U=self.getvar('U')
+#         V=self.getvar('V')
+#         W=self.getvar('W')
+#         lon=self.getvar('Longrid')
+#         lat=self.getvar('Latgrid')
+#         alt=self.getvar('ZP')
+#         try:
+#             self.para['Altcross']
+#             X=lon
+#             Y=lat
+#             select="Horizontal cross section is being plotted"
+#         except KeyError:
+#             try:
+#                 self.para['Latcross']
+#                 X=lon
+#                 Y=alt
+#                 V=W
+#                 select="Vertical East West cross section is being plotted"
+#             except KeyError:
+#                 try:
+#                     self.para['Loncross']
+#                     X=lat
+#                     Y=alt
+#                     U=V
+#                     V=W
+#                     select="Vertical North South cross section is being plotted"
+#                 except:
+#                     print('Their is a problem on the ploting module - ask your mom')
+#         print("U shape"+str(U.shape))
+#         print("V shape"+str(V.shape))
+#         print("Y shape"+str(Y.shape))
+#         print("X shape"+str(X.shape))
+#         if X.shape != U.shape and Y.shape != V.shape:
+#             print('x * y does not equal to U or V')
+#         Up=U[::Nbarb,::Nbarb]
+#         Vp=V[::Nbarb,::Nbarb]
+#         Xp=X[::Nbarb,::Nbarb]
+#         Yp=Y[::Nbarb,::Nbarb]
+# #         plot=plt.barbs(Xp,Yp,Up,Vp,length=Lbarb, barbcolor=['k'],pivot='middle',sizes=dict(emptybarb=0))
+#         plot=plt.quiver(Xp,Yp,Up,Vp)
+#         return plot
+# 
+#     #     ###################################
+#     #     # Position of the Stations
+#     #     ###################################
+#     #     StaPosFile="/home/thomas/PhD/obs-lcb/staClim/LatLonSta.csv"
+#     #     StaPos={}
+#     #     with open (StaPosFile) as StaPosF:
+#     #         reader_IAC=csv.reader(StaPosF,delimiter=",")
+#     #         header_IAC=reader_IAC.next()
+#     #         for h in header_IAC:
+#     #             StaPos[h]=[]
+#     #         for row in reader_IAC:
+#     #             for h,v in zip(header_IAC,row):
+#     #                 StaPos[h].append(v)
+#     # 
+#     #     Lat=np.array(Lat)
+#     #     Lon=np.array(Lon)
+#     #     LatStaI=[]
+#     #     LonStaI=[]
+#     #     LatSta=[]
+#     #     LonSta=[]
+#     #     StaName=[]
+#     #     for ista,sta in enumerate(StaPos['Posto']):
+#     #         print('open station=> '+sta)
+#     #         LatI=np.searchsorted(Lat,float(StaPos['Lat '][ista]), side="left")
+#     #         LonI=np.searchsorted(Lon,float(StaPos['Lon'][ista]), side="left")
+#     #         if LatI!=0 and LonI!=0:
+#     #             LatSta=LatSta+[float(StaPos['Lat '][ista])]# Use in compareGFS_OBS.py
+#     #             LonSta=LonSta+[float(StaPos['Lon'][ista])]#Use in compareGFS_OBS.py
+#     #             LatStaI=LatStaI+[LatI]
+#     #             LonStaI=LonStaI+[LonI]
+#     #             StaName=StaName+[StaPos['Posto'][ista]]
+#     #             print("In map => "+ StaPos['Posto'][ista] +" at "+ str(LatI) +" and " +str(LonI))
+#     pass

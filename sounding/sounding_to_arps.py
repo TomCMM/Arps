@@ -31,7 +31,6 @@ if __name__ =='__main__':
         
         
     for i,file in enumerate(files):
-    
         try:
             data = pd.read_csv(file, skiprows=7, header=None, delim_whitespace=True, error_bad_lines=False)
             data =data.convert_objects(convert_numeric=True)

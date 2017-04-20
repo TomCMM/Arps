@@ -20,19 +20,6 @@ from clima_lib.LCBnet_lib import *
 from statmod_lib.loadingindex.estimateloading import select_stations
 
 
-
-
-def geo_idx(dd, dd_array):
-    """
-      search for nearest decimal degree in an array of decimal degrees and return the index.
-      np.argmin returns the indices of minium value along an axis.
-      so subtract dd from all values in dd_array, take absolute value and find index of minium.
-     """
-
-    geo_idx = (np.abs(dd_array - dd)).argmin()
-    return geo_idx
-
-
 def rdf(path):
     print "reading" + path
     dfPT = pd.read_csv(path)
